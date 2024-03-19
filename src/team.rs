@@ -20,6 +20,10 @@ impl Team {
         &self.member_list
     }
 
+    pub fn member_list_mut(&mut self) -> &mut [Member] {
+        &mut self.member_list
+    }
+
     pub fn member(&self, member_id: usize) -> Option<&Member> {
         self.member_list.get(member_id)
     }
@@ -54,8 +58,19 @@ impl Member {
         self.properties.health
     }
 
-    pub fn act(&mut self, action: &dyn Action, target: Target) {}
+    pub fn statistics(&self) -> &Statistics {
+        &self.statistics
+    }
 
+    pub fn mut_statistics(&mut self) -> &mut Statistics {
+        &mut self.statistics
+    }
+
+    pub fn mut_properties(&mut self) -> &mut Properties {
+        &mut self.properties
+    }
+
+    /// Testing only!
     pub fn autodamage(&mut self, damage: u64) {
         self.properties.health = self.properties.health.saturating_sub(damage);
     }
@@ -82,8 +97,8 @@ impl Properties {
 /// Here can go stuff like "max health points" or "attack".
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Statistics {
-    max_health: u64,
-    attack: u64,
+    pub max_health: u64,
+    pub attack: u64,
 }
 
 impl Statistics {

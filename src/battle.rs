@@ -1,4 +1,7 @@
-use crate::{action::MemberIdentifier, team::Team};
+use crate::{
+    action::{Action, ChoiceCallback, MemberIdentifier, Target},
+    team::{self, Member, Team},
+};
 
 /// Instance of a unique fight between multiple [`Team`]s.
 pub struct Battle {
@@ -11,6 +14,7 @@ pub struct Battle {
     turn_system: Option<TurnSystem>,
     /// Current battle state.
     state: State,
+    action_choice_callback: Box<ChoiceCallback>,
 }
 
 pub struct BattleBuilder {
@@ -26,13 +30,18 @@ pub enum State {
 }
 
 impl BattleBuilder {
-    pub fn new(team_list: Vec<Team>, startup: Option<StartupInfo>) -> Self {
+    pub fn new(
+        team_list: Vec<Team>,
+        startup: Option<StartupInfo>,
+        action_choice_callback: Box<ChoiceCallback>,
+    ) -> Self {
         Self {
             inner: Battle {
                 team_list,
                 startup,
                 turn_system: None,
                 state: State::Preparating,
+                action_choice_callback: action_choice_callback,
             },
         }
     }
@@ -54,7 +63,7 @@ impl Battle {
             .expect("no turn system was initialized");
 
         loop {
-            self.state = turn_system.play_turn(&mut self.team_list);
+            self.state = turn_system.play_turn(&mut self.team_list, &self.action_choice_callback);
 
             if let State::Finished = self.state {
                 break;
@@ -90,7 +99,11 @@ impl TurnSystem {
         }
     }
 
-    pub fn play_turn(&mut self, team_list: &mut [Team]) -> State {
+    pub fn play_turn(
+        &mut self,
+        team_list: &mut [Team],
+        action_choice_callback: &Box<ChoiceCallback>,
+    ) -> State {
         // Count the new turn
         self.turn_number = self
             .turn_number
@@ -113,14 +126,21 @@ impl TurnSystem {
 
         println!("It's the turn of {}", playing_member.name());
 
-        playing_member.autodamage(15);
+        let (action, performers, targets) = action_choice_callback();
+
+        //playing_member.autodamage(15);
+
+        // Setup the chosen action
+        let performers = self.find_all_targets(team_list, performers);
+        let targets = self.find_all_targets(team_list, targets);
+        action.act(performers, targets);
 
         match self.find_next_player(team_list) {
             Some(m) => {
                 self.playing_member = m;
 
                 State::InProgress
-            },
+            }
             None => State::Finished,
         }
     }
@@ -136,7 +156,7 @@ impl TurnSystem {
             }
         }
 
-        return None;
+        None
     }
 }
 
