@@ -1,15 +1,18 @@
-use crate::action::{Action, Target};
+use std::rc::Rc;
 
 /// Coalition made up of multiple fighting [`Member`]s.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Team {
     name: String,
-    member_list: Vec<Member>,
+    member_list: Rc<Vec<Member>>,
 }
 
 impl Team {
     pub fn new(name: String, member_list: Vec<Member>) -> Self {
-        Self { name, member_list }
+        Self {
+            name,
+            member_list: Rc::new(member_list),
+        }
     }
 
     pub fn name(&self) -> &str {
@@ -34,7 +37,7 @@ impl Team {
 }
 
 /// Fighting entity of a [`Team`]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Member {
     name: String,
     properties: Properties,
@@ -79,7 +82,7 @@ impl Member {
 /// Properties of a [`Member`] that can change during a match.
 ///
 /// Most commonly, here must be implemented the current health points and additional multipliers.
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Properties {
     pub health: u64,
 }

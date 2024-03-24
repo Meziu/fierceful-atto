@@ -1,5 +1,7 @@
 use crate::team::{Member, Team};
 
+use std::{cell::RefCell, rc::Rc};
+
 pub type ChoiceCallback = dyn Fn() -> (Box<dyn Action>, Target, Target);
 
 /// Action that can be performed by team members that affects a specified target.
@@ -10,11 +12,11 @@ pub type ChoiceCallback = dyn Fn() -> (Box<dyn Action>, Target, Target);
 /// Even members of different teams or whole teams can perform the same action together!
 pub trait Action {
     ///
-    fn act(&self, performers: Vec<&mut Member>, targets: Vec<&mut Member>);
+    fn act(&self, context: Context);
 }
 
 /// Simple representation of the team index + member index of a specific member.
-#[derive(Default, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct MemberIdentifier {
     pub team_id: usize,
     pub member_id: usize,
@@ -23,15 +25,22 @@ pub struct MemberIdentifier {
 /// Single or multiple targets being affected by an action.
 ///
 /// It may also refer to the action's performer.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Target {
     /// A single member is affected by the action.
     Single(MemberIdentifier),
     /// A specific choice of members is affected by the action.
     DiscreteMultiple(Vec<MemberIdentifier>),
-    /// A complete team is affected by the action.
+    /// A whole team is affected by the action.
     FullTeam { team_id: usize },
     /// All members of all teams are affected by the action.
     All,
+}
+
+pub struct Context {
+    team_list: Rc<Vec<Team>>,
+    performers: Target,
+    targets: Target,
 }
 
 enum TargetIterCounter {
@@ -45,8 +54,26 @@ enum TargetIterCounter {
 
 pub struct TargetIter<'team> {
     target: Target,
-    team_list: &'team mut [Team],
+    team_list: &'team [Team],
     iterator_counter: TargetIterCounter,
+}
+
+impl Context {
+    pub fn new(team_list: Rc<Vec<Team>>, performers: Target, targets: Target) -> Self {
+        Self {
+            team_list,
+            performers,
+            targets,
+        }
+    }
+
+    pub fn performers(&self) -> TargetIter {
+        TargetIter::new(self.performers.clone(), &self.team_list)
+    }
+
+    pub fn targets(&self) -> TargetIter {
+        TargetIter::new(self.targets.clone(), &self.team_list)
+    }
 }
 
 impl MemberIdentifier {
@@ -63,7 +90,7 @@ impl MemberIdentifier {
 }
 
 impl<'team> TargetIter<'team> {
-    pub fn new(target: Target, team_list: &'team mut [Team]) -> Self {
+    pub fn new(target: Target, team_list: &'team [Team]) -> Self {
         Self {
             target,
             team_list,
@@ -76,7 +103,7 @@ impl<'team> Iterator for TargetIter<'team> {
     type Item = &'team mut Member;
 
     fn next(&mut self) -> Option<Self::Item> {
-        return match self.target {
+        return match &self.target {
             Target::Single(id) => {
                 // If we haven't yielded this single target yet, do so and save the change in the counter.
                 if let TargetIterCounter::None = self.iterator_counter {
@@ -129,7 +156,7 @@ impl<'team> Iterator for TargetIter<'team> {
                 if let TargetIterCounter::DoneUntil(next) = self.iterator_counter {
                     let target = self
                         .team_list
-                        .get_mut(team_id)
+                        .get_mut(*team_id)
                         .expect("could not find specified team")
                         .member_mut(next)
                         .expect("could not find specified member");
@@ -145,11 +172,28 @@ impl<'team> Iterator for TargetIter<'team> {
                 None
             }
             Target::All => {
-                for t in team_list {
-                    for m in t.member_list_mut() {
-                        m
+                let mut counter: usize = 0;
+
+                for team in self.team_list {
+                    for m in team.member_list_mut() {
+                        if let TargetIterCounter::DoneUntil(c) = self.iterator_counter {
+                            if c == counter {
+                                self.iterator_counter = TargetIterCounter::DoneUntil(
+                                    counter
+                                        .checked_add(1)
+                                        .expect("usize overflow when fetching next target"),
+                                );
+                                return Some(m);
+                            }
+                        }
+
+                        counter = counter
+                            .checked_add(1)
+                            .expect("usize overflow when fetching next target");
                     }
                 }
+
+                None
             }
         };
     }
