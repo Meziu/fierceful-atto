@@ -1,5 +1,5 @@
 use crate::{
-    action::{Action, Context, ChoiceCallback, MemberIdentifier, Target, TargetIter},
+    action::{Action, ChoiceCallback, Context, MemberIdentifier, Target, TargetIter},
     team::{self, Member, Team},
 };
 
@@ -74,7 +74,8 @@ impl Battle {
         }
 
         // Return ending state of the battling teams.
-        Rc::into_inner(self.team_list).expect("found multiple references to what should be the unique final result")
+        Rc::into_inner(self.team_list)
+            .expect("found multiple references to what should be the unique final result")
     }
 }
 
