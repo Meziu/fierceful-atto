@@ -1,8 +1,8 @@
 use crate::team::{Member, Team};
 
-use std::{cell::RefCell, rc::Rc};
-
-pub type ChoiceCallback = dyn Fn() -> (Box<dyn Action>, Target, Target);
+pub type ChoiceReturn = (Box<dyn Action>, Target, Target);
+pub type ChoiceCallback = dyn Fn() -> ChoiceReturn;
+pub type MemberIter<'a, 't> = Box<dyn Iterator<Item = &'t mut Member> + 'a>;
 
 /// Action that can be performed by team members that affects a specified target.
 ///
@@ -12,7 +12,7 @@ pub type ChoiceCallback = dyn Fn() -> (Box<dyn Action>, Target, Target);
 /// Even members of different teams or whole teams can perform the same action together!
 pub trait Action {
     ///
-    fn act(&self, context: Context);
+    fn act(&mut self, context: Context<'_>);
 }
 
 /// Simple representation of the team index + member index of a specific member.
@@ -37,29 +37,14 @@ pub enum Target {
     All,
 }
 
-pub struct Context {
-    team_list: Rc<Vec<Team>>,
+pub struct Context<'team> {
+    team_list: &'team mut Vec<Team>,
     performers: Target,
     targets: Target,
 }
 
-enum TargetIterCounter {
-    /// No targets yielded yet.
-    None,
-    /// The "single" target has been yielded
-    DoneSingle,
-    /// Every target (in the original order) was yielded up until this index.
-    DoneUntil(usize),
-}
-
-pub struct TargetIter<'team> {
-    target: Target,
-    team_list: &'team [Team],
-    iterator_counter: TargetIterCounter,
-}
-
-impl Context {
-    pub fn new(team_list: Rc<Vec<Team>>, performers: Target, targets: Target) -> Self {
+impl<'i, 's: 'i, 'team: 'i> Context<'team> {
+    pub fn new(team_list: &'team mut Vec<Team>, performers: Target, targets: Target) -> Self {
         Self {
             team_list,
             performers,
@@ -67,12 +52,56 @@ impl Context {
         }
     }
 
-    pub fn performers(&self) -> TargetIter {
-        TargetIter::new(self.performers.clone(), &self.team_list)
+    pub fn performers(&'s mut self) -> MemberIter<'i, 's> {
+        self.target_iter(self.performers.clone())
     }
 
-    pub fn targets(&self) -> TargetIter {
-        TargetIter::new(self.targets.clone(), &self.team_list)
+    pub fn targets(&'s mut self) -> MemberIter<'i, 's> {
+        self.target_iter(self.targets.clone())
+    }
+
+    /// Function that iterates over all members targeted.
+    fn target_iter(&'s mut self, target: Target) -> MemberIter<'i, 's> {
+        match target {
+            // Return a `Once` iterator to the single member that is targeted.
+            // TODO: just return None if the member is not found, like the other iterators.
+            Target::Single(id) => Box::new(std::iter::once(
+                self.team_list
+                    .get_mut(id.team_id)
+                    .expect("could not find target team")
+                    .member_mut(id.member_id)
+                    .expect("could not find target member"),
+            )),
+            Target::DiscreteMultiple(targets) => Box::new(
+                self.team_list
+                    .iter_mut()
+                    .enumerate()
+                    .flat_map(|(i, t)| {
+                        std::iter::repeat(i).zip(t.member_list_mut().iter_mut().enumerate())
+                    })
+                    .filter(move |(t_id, (m_id, _))| {
+                        return targets.contains(&MemberIdentifier {
+                            team_id: *t_id,
+                            member_id: *m_id,
+                        });
+                    })
+                    .map(|(_, (_, m))| m),
+            ),
+            // Return an iterator that iterates over every member of a single team.
+            Target::FullTeam { team_id } => Box::new(
+                self.team_list
+                    .get_mut(team_id)
+                    .expect("could not find target team")
+                    .member_list_mut()
+                    .iter_mut(),
+            ),
+            // Return an iterator that iterates over every member of every team. It's pretty simple with `flat_map()`.
+            Target::All => Box::new(
+                self.team_list
+                    .iter_mut()
+                    .flat_map(|t| t.member_list_mut().iter_mut()),
+            ),
+        }
     }
 }
 
@@ -88,13 +117,13 @@ impl MemberIdentifier {
         }
     }
 }
-
+/*
 impl<'team> TargetIter<'team> {
-    pub fn new(target: Target, team_list: &'team [Team]) -> Self {
+    pub fn new(target: Target, team_list: &'team mut Vec<Team>) -> Self {
         Self {
             target,
             team_list,
-            iterator_counter: TargetIterCounter::None,
+            counter: 0,
         }
     }
 }
@@ -106,8 +135,8 @@ impl<'team> Iterator for TargetIter<'team> {
         return match &self.target {
             Target::Single(id) => {
                 // If we haven't yielded this single target yet, do so and save the change in the counter.
-                if let TargetIterCounter::None = self.iterator_counter {
-                    self.iterator_counter = TargetIterCounter::DoneSingle;
+                if self.counter == 0 {
+                    self.counter = 1;
 
                     return Some(
                         self.team_list
@@ -121,80 +150,88 @@ impl<'team> Iterator for TargetIter<'team> {
                 None
             }
             Target::DiscreteMultiple(ids) => {
-                // If no targets have been yielded, set to yield the first
-                if let TargetIterCounter::None = self.iterator_counter {
-                    self.iterator_counter = TargetIterCounter::DoneUntil(0);
-                }
-
                 // Get the target to yield from the counter and return it.
-                if let TargetIterCounter::DoneUntil(next) = self.iterator_counter {
-                    let target = ids.get(next)?;
+                let target = ids.get(self.counter)?;
 
-                    self.iterator_counter = TargetIterCounter::DoneUntil(
-                        next.checked_add(1)
-                            .expect("usize overflow when fetching next target"),
-                    );
+                self.counter = self
+                    .counter
+                    .checked_add(1)
+                    .expect("usize overflow when fetching next target");
 
-                    return Some(
-                        self.team_list
-                            .get_mut(target.team_id)
-                            .expect("could not find specified team")
-                            .member_mut(target.member_id)
-                            .expect("could not find specified member"),
-                    );
-                }
-
-                None
+                Some(
+                    self.team_list
+                        .get_mut(target.team_id)
+                        .expect("could not find specified team")
+                        .member_mut(target.member_id)
+                        .expect("could not find specified member"),
+                )
             }
             Target::FullTeam { team_id } => {
-                // If no targets have been yielded, set to yield the first
-                if let TargetIterCounter::None = self.iterator_counter {
-                    self.iterator_counter = TargetIterCounter::DoneUntil(0);
-                }
+                let target = self
+                    .team_list
+                    .get_mut(*team_id)
+                    .expect("could not find specified team")
+                    .member_mut(self.counter)
+                    .expect("could not find specified member");
 
-                // Get the target to yield from the counter and return it.
-                if let TargetIterCounter::DoneUntil(next) = self.iterator_counter {
-                    let target = self
-                        .team_list
-                        .get_mut(*team_id)
-                        .expect("could not find specified team")
-                        .member_mut(next)
-                        .expect("could not find specified member");
+                self.counter = self
+                    .counter
+                    .checked_add(1)
+                    .expect("usize overflow when fetching next target");
 
-                    self.iterator_counter = TargetIterCounter::DoneUntil(
-                        next.checked_add(1)
-                            .expect("usize overflow when fetching next target"),
-                    );
-
-                    return Some(target);
-                }
-
-                None
+                Some(target)
             }
             Target::All => {
                 let mut counter: usize = 0;
 
-                for team in self.team_list {
+                for team in self.team_list.iter_mut() {
                     for m in team.member_list_mut() {
-                        if let TargetIterCounter::DoneUntil(c) = self.iterator_counter {
-                            if c == counter {
-                                self.iterator_counter = TargetIterCounter::DoneUntil(
-                                    counter
-                                        .checked_add(1)
-                                        .expect("usize overflow when fetching next target"),
-                                );
-                                return Some(m);
-                            }
+                        if self.counter == counter {
+                            self.counter = counter
+                                .checked_add(1)
+                                .expect("usize overflow when fetching next target");
+
+                            return Some(m);
                         }
-
-                        counter = counter
-                            .checked_add(1)
-                            .expect("usize overflow when fetching next target");
                     }
-                }
 
+                    counter = counter
+                        .checked_add(1)
+                        .expect("usize overflow when fetching next target");
+                }
                 None
             }
         };
     }
+
+    // Exact size calculation for the ExactSizeIterator trait.
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let size = match &self.target {
+            Target::Single(_) => 1,
+            Target::DiscreteMultiple(v) => v.len(),
+            Target::FullTeam { team_id } => self
+                .team_list
+                .get(*team_id)
+                .expect("could not find specified team")
+                .member_list()
+                .len(),
+            Target::All => {
+                let mut counter: usize = 0;
+
+                for t in self.team_list.iter() {
+                    counter = counter.saturating_add(t.member_list().len());
+                }
+
+                counter
+            }
+        };
+
+        // Only the "remaining" items must be returned
+        let size = size.saturating_sub(self.counter);
+
+        (size, Some(size))
+    }
 }
+
+impl ExactSizeIterator for TargetIter<'_> {}
+*/

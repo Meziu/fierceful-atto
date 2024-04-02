@@ -1,6 +1,4 @@
-use std::ops::SubAssign;
-
-use fierceful_atto::action::Action;
+use fierceful_atto::action::{Action, ChoiceReturn, Context, MemberIdentifier, Target};
 use fierceful_atto::battle::{Battle, BattleBuilder};
 use fierceful_atto::team::{Member, Properties, Statistics, Team};
 
@@ -8,19 +6,24 @@ use fierceful_atto::team::{Member, Properties, Statistics, Team};
 struct BasicAttack;
 
 impl Action for BasicAttack {
-    fn act(performers: Vec<&mut Member>, targets: Vec<&mut Member>) {
+    fn act(&mut self, mut context: Context<'_>) {
         let mut damage_sum: u64 = 0;
 
-        for p in performers {
+        for p in context.performers() {
             // Calculate the sum of all performers' attacks
             damage_sum = damage_sum.saturating_add(p.statistics().attack);
         }
 
-        for t in targets {
+        for t in context.targets() {
             // Unleash hell on a poor target
             let curr_props = t.mut_properties();
             curr_props.health = curr_props.health.saturating_sub(damage_sum);
+
+            println!("Member {} takes {} damage!", t.name(), damage_sum);
+            println!("Member only has {} health points!", t.health());
         }
+        
+        std::thread::sleep(std::time::Duration::from_secs(1));
     }
 }
 
@@ -48,10 +51,24 @@ fn main() {
     println!("Before battle: {:#?}", teams);
 
     // The battle must be mutable to make incremental steps (it's currently fully consumed by the system)
-    let mut battle: Battle = BattleBuilder::new(teams, None).build();
+    let battle: Battle = BattleBuilder::new(teams, None, Box::new(action_choice)).build();
 
     let resulting_teams = battle.run();
 
     // Output the starting configuration of the battling teams.
     println!("After battle: {:#?}", resulting_teams);
+}
+
+fn action_choice() -> ChoiceReturn {
+    (
+        Box::new(BasicAttack),
+        Target::Single(MemberIdentifier {
+            team_id: 0,
+            member_id: 0,
+        }),
+        Target::Single(MemberIdentifier {
+            team_id: 1,
+            member_id: 0,
+        }),
+    )
 }

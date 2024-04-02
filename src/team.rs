@@ -1,17 +1,15 @@
-use std::rc::Rc;
-
 /// Coalition made up of multiple fighting [`Member`]s.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Team {
     name: String,
-    member_list: Rc<Vec<Member>>,
+    member_list: Vec<Member>,
 }
 
 impl Team {
     pub fn new(name: String, member_list: Vec<Member>) -> Self {
         Self {
             name,
-            member_list: Rc::new(member_list),
+            member_list: member_list,
         }
     }
 

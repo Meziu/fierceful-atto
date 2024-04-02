@@ -1,14 +1,13 @@
 use crate::{
-    action::{Action, ChoiceCallback, Context, MemberIdentifier, Target, TargetIter},
-    team::{self, Member, Team},
+    action::{ChoiceCallback, Context, MemberIdentifier},
+    team::Team,
 };
-
-use std::{cell::RefCell, rc::Rc};
 
 /// Instance of a unique fight between multiple [`Team`]s.
 pub struct Battle {
     /// List of all teams involved in the battle.
-    team_list: Rc<Vec<Team>>,
+    team_list: Vec<Team>,
+    #[allow(dead_code)]
     startup: Option<StartupInfo>,
     /// Turn system in charge of handling turns and actions of the battle.
     ///
@@ -39,7 +38,7 @@ impl BattleBuilder {
     ) -> Self {
         Self {
             inner: Battle {
-                team_list: Rc::new(team_list),
+                team_list,
                 startup,
                 turn_system: None,
                 state: State::Preparating,
@@ -65,8 +64,7 @@ impl Battle {
             .expect("no turn system was initialized");
 
         loop {
-            self.state =
-                turn_system.play_turn(self.team_list.clone(), &self.action_choice_callback);
+            self.state = turn_system.play_turn(&mut self.team_list, &self.action_choice_callback);
 
             if let State::Finished = self.state {
                 break;
@@ -74,8 +72,7 @@ impl Battle {
         }
 
         // Return ending state of the battling teams.
-        Rc::into_inner(self.team_list)
-            .expect("found multiple references to what should be the unique final result")
+        self.team_list
     }
 }
 
@@ -105,7 +102,7 @@ impl TurnSystem {
 
     pub fn play_turn(
         &mut self,
-        mut team_list: Rc<Vec<Team>>,
+        team_list: &mut Vec<Team>,
         action_choice_callback: &Box<ChoiceCallback>,
     ) -> State {
         // Count the new turn
@@ -130,16 +127,16 @@ impl TurnSystem {
 
         println!("It's the turn of {}", playing_member.name());
 
-        let (action, performers, targets) = action_choice_callback();
+        let (mut action, performers, targets) = action_choice_callback();
 
         // TODO: Make an action to substitute the autodamange functionality
         // playing_member.autodamage(15);
 
         // Setup the chosen action
-        let context = Context::new(team_list.clone(), performers, targets);
+        let context = Context::new(team_list, performers, targets);
         action.act(context);
 
-        match self.find_next_player(team_list.clone()) {
+        match self.find_next_player(&team_list) {
             Some(m) => {
                 self.playing_member = m;
 
@@ -149,10 +146,8 @@ impl TurnSystem {
         }
     }
 
-    fn find_next_player(&mut self, team_list: Rc<Vec<Team>>) -> Option<MemberIdentifier> {
-        for (team_id, team) in
-            cycle_from_point_enumerated(team_list.as_slice(), self.playing_member.team_id)
-        {
+    fn find_next_player(&mut self, team_list: &[Team]) -> Option<MemberIdentifier> {
+        for (team_id, team) in cycle_from_point_enumerated(team_list, self.playing_member.team_id) {
             for (member_id, member) in
                 cycle_from_point_enumerated(team.member_list(), team.member_list().len())
             {
