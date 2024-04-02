@@ -7,10 +7,7 @@ pub struct Team {
 
 impl Team {
     pub fn new(name: String, member_list: Vec<Member>) -> Self {
-        Self {
-            name,
-            member_list: member_list,
-        }
+        Self { name, member_list }
     }
 
     pub fn name(&self) -> &str {
@@ -80,6 +77,7 @@ impl Member {
 /// Properties of a [`Member`] that can change during a match.
 ///
 /// Most commonly, here must be implemented the current health points and additional multipliers.
+#[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Properties {
     pub health: u64,
@@ -96,6 +94,7 @@ impl Properties {
 /// Unmutable statistics related to a specific member.
 ///
 /// Here can go stuff like "max health points" or "attack".
+#[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Statistics {
     pub max_health: u64,

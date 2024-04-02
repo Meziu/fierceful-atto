@@ -16,6 +16,7 @@ pub trait Action {
 }
 
 /// Simple representation of the team index + member index of a specific member.
+#[non_exhaustive]
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct MemberIdentifier {
     pub team_id: usize,
@@ -72,18 +73,22 @@ impl<'i, 's: 'i, 'team: 'i> Context<'team> {
                     .member_mut(id.member_id)
                     .expect("could not find target member"),
             )),
+            // Return a filtered iterator over all individual targets.
             Target::DiscreteMultiple(targets) => Box::new(
                 self.team_list
                     .iter_mut()
+                    // Enumerating helps filter which teams/members we are actually targeting.
                     .enumerate()
                     .flat_map(|(i, t)| {
+                        // `Repeat` is used to return the same `team_id` number to each member of a team.
+                        // We also re-enumerate over the members to keep track of the `member_id`
                         std::iter::repeat(i).zip(t.member_list_mut().iter_mut().enumerate())
                     })
                     .filter(move |(t_id, (m_id, _))| {
-                        return targets.contains(&MemberIdentifier {
+                        targets.contains(&MemberIdentifier {
                             team_id: *t_id,
                             member_id: *m_id,
-                        });
+                        })
                     })
                     .map(|(_, (_, m))| m),
             ),

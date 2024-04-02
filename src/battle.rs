@@ -18,7 +18,7 @@ pub struct Battle {
     action_choice_callback: Box<ChoiceCallback>,
 }
 
-pub struct BattleBuilder {
+pub struct Builder {
     inner: Battle,
 }
 
@@ -30,7 +30,7 @@ pub enum State {
     Finished,
 }
 
-impl BattleBuilder {
+impl Builder {
     pub fn new(
         team_list: Vec<Team>,
         startup: Option<StartupInfo>,
@@ -42,7 +42,7 @@ impl BattleBuilder {
                 startup,
                 turn_system: None,
                 state: State::Preparating,
-                action_choice_callback: action_choice_callback,
+                action_choice_callback,
             },
         }
     }
@@ -57,6 +57,10 @@ impl Battle {
     /// Runs a [`Battle`] to completion, returning the final state of the battling teams.
     ///
     /// The winner will be declared by the end of this function.
+    ///
+    /// # Panics
+    ///
+    /// The function will panic if no turn system was internally initialized, or if any conditions for which [`TurnSystem::play_turn()`] would panic occour.
     pub fn run(mut self) -> Vec<Team> {
         let turn_system = self
             .turn_system
@@ -79,6 +83,7 @@ impl Battle {
 /// Information needed to start a new [`Battle`].
 ///
 /// Here can be stored all sorts of specific infos, like the first team/player that has to play etc.
+#[non_exhaustive]
 pub struct StartupInfo {}
 
 /// Handler of the turn-based combat.
@@ -100,10 +105,15 @@ impl TurnSystem {
         }
     }
 
+    /// Simulate one turn of the battle.
+    ///
+    /// # Panics
+    ///
+    /// The function will panic if the turn counter overflows `u64::MAX` or if teams/members are not found when specified.
     pub fn play_turn(
         &mut self,
         team_list: &mut Vec<Team>,
-        action_choice_callback: &Box<ChoiceCallback>,
+        action_choice_callback: &ChoiceCallback,
     ) -> State {
         // Count the new turn
         self.turn_number = self
@@ -129,14 +139,14 @@ impl TurnSystem {
 
         let (mut action, performers, targets) = action_choice_callback();
 
-        // TODO: Make an action to substitute the autodamange functionality
+        // TODO: Make an action to substitute the autodamage functionality
         // playing_member.autodamage(15);
 
         // Setup the chosen action
         let context = Context::new(team_list, performers, targets);
         action.act(context);
 
-        match self.find_next_player(&team_list) {
+        match self.find_next_player(team_list) {
             Some(m) => {
                 self.playing_member = m;
 

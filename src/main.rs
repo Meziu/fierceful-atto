@@ -1,12 +1,12 @@
 use fierceful_atto::action::{Action, ChoiceReturn, Context, MemberIdentifier, Target};
-use fierceful_atto::battle::{Battle, BattleBuilder};
+use fierceful_atto::battle::{Battle, Builder};
 use fierceful_atto::team::{Member, Properties, Statistics, Team};
 
 // Example of a possible action
 struct BasicAttack;
 
 impl Action for BasicAttack {
-    fn act(&mut self, mut context: Context<'_>) {
+    fn act(&mut self, mut context: Context) {
         let mut damage_sum: u64 = 0;
 
         for p in context.performers() {
@@ -22,8 +22,8 @@ impl Action for BasicAttack {
             println!("Member {} takes {} damage!", t.name(), damage_sum);
             println!("Member only has {} health points!", t.health());
         }
-        
-        std::thread::sleep(std::time::Duration::from_secs(1));
+
+        std::thread::sleep(std::time::Duration::from_millis(500));
     }
 }
 
@@ -48,27 +48,21 @@ fn main() {
     ];
 
     // Output the starting configuration of the battling teams.
-    println!("Before battle: {:#?}", teams);
+    println!("Before battle: {teams:#?}");
 
     // The battle must be mutable to make incremental steps (it's currently fully consumed by the system)
-    let battle: Battle = BattleBuilder::new(teams, None, Box::new(action_choice)).build();
+    let battle: Battle = Builder::new(teams, None, Box::new(action_choice)).build();
 
     let resulting_teams = battle.run();
 
     // Output the starting configuration of the battling teams.
-    println!("After battle: {:#?}", resulting_teams);
+    println!("After battle: {resulting_teams:#?}");
 }
 
 fn action_choice() -> ChoiceReturn {
     (
         Box::new(BasicAttack),
-        Target::Single(MemberIdentifier {
-            team_id: 0,
-            member_id: 0,
-        }),
-        Target::Single(MemberIdentifier {
-            team_id: 1,
-            member_id: 0,
-        }),
+        Target::Single(MemberIdentifier::new(0, 0)),
+        Target::Single(MemberIdentifier::new(1, 0)),
     )
 }
