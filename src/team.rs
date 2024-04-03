@@ -1,8 +1,31 @@
+//! Module including definitions for [`Team`]s, [`Member`]s, and all that is deeply linked to the battle actors.
+
+/// Generic iterator over mutable [`Member`] references.
+/// 
+/// This is mainly used in [`Action`](crate::action::Action)s when iterating over action targets and performers.
+pub type MemberIter<'a, 't> = Box<dyn Iterator<Item = &'t mut Member> + 'a>;
+
 /// Coalition made up of multiple fighting [`Member`]s.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Team {
     name: String,
     member_list: Vec<Member>,
+}
+
+/// Fighting entity of a [`Team`]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Member {
+    name: String,
+    properties: Properties,
+    statistics: Statistics,
+}
+
+/// Simple representation of the team index + member index of a specific member.
+#[non_exhaustive]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct MemberIdentifier {
+    pub team_id: usize,
+    pub member_id: usize,
 }
 
 impl Team {
@@ -29,14 +52,6 @@ impl Team {
     pub fn member_mut(&mut self, member_id: usize) -> Option<&mut Member> {
         self.member_list.get_mut(member_id)
     }
-}
-
-/// Fighting entity of a [`Team`]
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Member {
-    name: String,
-    properties: Properties,
-    statistics: Statistics,
 }
 
 impl Member {
@@ -71,6 +86,19 @@ impl Member {
     /// Testing only!
     pub fn autodamage(&mut self, damage: u64) {
         self.properties.health = self.properties.health.saturating_sub(damage);
+    }
+}
+
+impl MemberIdentifier {
+    pub fn new(team_id: usize, member_id: usize) -> Self {
+        Self { team_id, member_id }
+    }
+
+    pub fn zeroed() -> Self {
+        Self {
+            team_id: 0,
+            member_id: 0,
+        }
     }
 }
 

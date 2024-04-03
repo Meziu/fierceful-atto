@@ -1,6 +1,6 @@
-use fierceful_atto::action::{Action, ChoiceReturn, Context, MemberIdentifier, Target};
-use fierceful_atto::battle::{Battle, Builder};
-use fierceful_atto::team::{Member, Properties, Statistics, Team};
+use fierceful_atto::action::{Action, Context, Target};
+use fierceful_atto::battle::{Battle, Builder, ChoiceReturn, EndCondition};
+use fierceful_atto::team::{Member, MemberIdentifier, Properties, Statistics, Team};
 
 // Example of a possible action
 struct BasicAttack;
@@ -51,7 +51,7 @@ fn main() {
     println!("Before battle: {teams:#?}");
 
     // The battle must be mutable to make incremental steps (it's currently fully consumed by the system)
-    let battle: Battle = Builder::new(teams, None, Box::new(action_choice)).build();
+    let battle: Battle = Builder::new(teams, None, Box::new(action_choice), EndCondition::LastTeamStanding).build();
 
     let resulting_teams = battle.run();
 
