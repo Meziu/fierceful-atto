@@ -51,7 +51,13 @@ fn main() {
     println!("Before battle: {teams:#?}");
 
     // The battle must be mutable to make incremental steps (it's currently fully consumed by the system)
-    let battle: Battle = Builder::new(teams, None, Box::new(action_choice), EndCondition::LastTeamStanding).build();
+    let battle: Battle = Builder::new(
+        teams,
+        None,
+        Box::new(action_choice),
+        EndCondition::LastTeamStanding,
+    )
+    .build();
 
     let resulting_teams = battle.run();
 

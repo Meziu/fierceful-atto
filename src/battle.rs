@@ -26,13 +26,13 @@ pub struct Builder {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EndCondition {
     /// End the battle if only one member is "alive" in the whole battle.
-    /// 
+    ///
     /// # Notes
-    /// 
+    ///
     /// It is up to the developer to ensure a way to resolve stalemates if more members of the same team remain alive.
     LastMemberStanding,
     /// End the battle if only one battling team has any "alive" members.
-    /// 
+    ///
     /// This is the most common end condition for team-to-team fighting.
     LastTeamStanding,
 }
@@ -78,7 +78,9 @@ impl Battle {
     /// The function will panic if no turn system was internally initialized, or if any conditions for which [`TurnSystem::play_turn()`] would panic occour.
     pub fn run(mut self) -> Vec<Team> {
         loop {
-            self.state = self.turn_system.play_turn(&mut self.team_list, &self.action_choice_callback);
+            self.state = self
+                .turn_system
+                .play_turn(&mut self.team_list, &self.action_choice_callback);
 
             if let State::Finished = self.state {
                 break;
@@ -159,7 +161,7 @@ impl TurnSystem {
 
         // Check whether the battle should continue or whether it's finished.
         if self.check_end_condition(team_list) {
-           return State::Finished;
+            return State::Finished;
         }
 
         // TODO: custom performer finder (does it even make sense with the "everyone" can perform model? maybe just as default behaviour for a more modular system)
@@ -193,7 +195,7 @@ impl TurnSystem {
                 }
 
                 true
-            },
+            }
             EndCondition::LastTeamStanding => {
                 let mut teams_alive: u8 = 0;
 

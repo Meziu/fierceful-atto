@@ -1,7 +1,7 @@
 //! Module including definitions for [`Team`]s, [`Member`]s, and all that is deeply linked to the battle actors.
 
 /// Generic iterator over mutable [`Member`] references.
-/// 
+///
 /// This is mainly used in [`Action`](crate::action::Action)s when iterating over action targets and performers.
 pub type MemberIter<'a, 't> = Box<dyn Iterator<Item = &'t mut Member> + 'a>;
 
