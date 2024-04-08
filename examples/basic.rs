@@ -1,6 +1,7 @@
 use fierceful_atto::action::{Action, Context, Target};
-use fierceful_atto::battle::{Battle, Builder, ChoiceReturn, EndCondition};
-use fierceful_atto::team::{Member, MemberIdentifier, Properties, Statistics, Team};
+use fierceful_atto::battle::{self, Battle, ChoiceReturn, EndCondition};
+use fierceful_atto::member::{Member, MemberIdentifier, Properties, Statistics};
+use fierceful_atto::team::Team;
 
 // Example of a simple action that inficts direct damage on targets.
 struct BasicAttack;
@@ -35,13 +36,13 @@ fn main() {
 
     let player_1 = Member::new(
         String::from("Picco"),
-        Properties::from_stats(&picco_stats),
         picco_stats,
+        Properties::from_stats(&picco_stats),
     );
     let player_2 = Member::new(
         String::from("Bacco"),
-        Properties::from_stats(&bacco_stats),
         bacco_stats,
+        Properties::from_stats(&bacco_stats),
     );
 
     let teams = vec![
@@ -53,7 +54,7 @@ fn main() {
     println!("Before battle: {teams:#?}");
 
     // The battle must be mutable to make incremental steps (it's currently fully consumed by the system)
-    let battle: Battle = Builder::new(
+    let battle: Battle = battle::Builder::new(
         teams,
         None,
         Box::new(action_choice),

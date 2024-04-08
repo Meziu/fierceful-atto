@@ -1,6 +1,7 @@
 use crate::{
     action::{Action, Context, Target},
-    team::{MemberIdentifier, Team},
+    member::{Member, MemberIdentifier},
+    team::Team,
 };
 
 pub type ChoiceReturn = (Box<dyn Action>, Target, Target);
@@ -150,13 +151,11 @@ impl TurnSystem {
 
         let (mut action, performers, targets) = action_choice_callback();
 
-        // TODO: Make an action to substitute the autodamage functionality
-        // playing_member.autodamage(15);
-
         // Setup the chosen action
         let context = Context::new(team_list, performers, targets);
         action.act(context);
 
+        // TODO: Programmatically decide when the turn should end (after every player acts? after one player acts?)
         // TODO: Run an "end of turn" custom hook.
 
         // Check whether the battle should continue or whether it's finished.

@@ -1,4 +1,5 @@
-use crate::team::{MemberIdentifier, MemberIter, Team};
+use crate::member::{MemberIdentifier, MemberIter};
+use crate::team::Team;
 
 /// Action that can be performed by team members that affects a specified target.
 ///
@@ -19,6 +20,10 @@ pub enum Target {
     /// A single member is affected by the action.
     Single(MemberIdentifier),
     /// A specific choice of members is affected by the action.
+    ///
+    /// # Notes
+    ///
+    /// Any duplicate [`MemberIdentifier`] will be considered only once.
     DiscreteMultiple(Vec<MemberIdentifier>),
     /// A whole team is affected by the action.
     FullTeam { team_id: usize },
