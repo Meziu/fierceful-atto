@@ -20,7 +20,7 @@ pub struct Member {
     statistics: Statistics,
 }
 
-/// Simple representation of the team index + member index of a specific member.
+/// Identifier of a member using the team index and relative member index.
 #[non_exhaustive]
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct MemberIdentifier {
@@ -83,8 +83,12 @@ impl Member {
         &mut self.properties
     }
 
-    /// Testing only!
-    pub fn autodamage(&mut self, damage: u64) {
+    /// Damages the [`Member`]'s health, subtracting the exact amount of health points passed.
+    ///
+    /// # Notes
+    ///
+    /// The health subtraction saturates to 0 if the damage exceeds the current health.
+    pub fn damage(&mut self, damage: u64) {
         self.properties.health = self.properties.health.saturating_sub(damage);
     }
 }

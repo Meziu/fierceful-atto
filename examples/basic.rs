@@ -2,7 +2,7 @@ use fierceful_atto::action::{Action, Context, Target};
 use fierceful_atto::battle::{Battle, Builder, ChoiceReturn, EndCondition};
 use fierceful_atto::team::{Member, MemberIdentifier, Properties, Statistics, Team};
 
-// Example of a possible action
+// Example of a simple action that inficts direct damage on targets.
 struct BasicAttack;
 
 impl Action for BasicAttack {
@@ -10,20 +10,22 @@ impl Action for BasicAttack {
         let mut damage_sum: u64 = 0;
 
         for p in context.performers() {
-            // Calculate the sum of all performers' attacks
+            // Calculate the sum of all performers' attacks.
             damage_sum = damage_sum.saturating_add(p.statistics().attack);
         }
 
         for t in context.targets() {
-            // Unleash hell on a poor target
-            let curr_props = t.mut_properties();
-            curr_props.health = curr_props.health.saturating_sub(damage_sum);
+            // Unleash the combined damage on a single target.
+            t.damage(damage_sum);
 
-            println!("Member {} takes {} damage!", t.name(), damage_sum);
-            println!("Member only has {} health points!", t.health());
+            println!(
+                "Member {} takes {} damage! Health: {}/{}",
+                t.name(),
+                damage_sum,
+                t.health(),
+                t.statistics().max_health
+            );
         }
-
-        std::thread::sleep(std::time::Duration::from_millis(500));
     }
 }
 
@@ -66,6 +68,7 @@ fn main() {
 }
 
 fn action_choice() -> ChoiceReturn {
+    // TODO: Make this an actual choice (or maybe based on the turn?).
     (
         Box::new(BasicAttack),
         Target::Single(MemberIdentifier::new(0, 0)),

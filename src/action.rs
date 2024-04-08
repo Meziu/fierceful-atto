@@ -41,10 +41,28 @@ impl<'i, 's: 'i, 'team: 'i> Context<'team> {
         }
     }
 
+    /// Returns a mutable iterator over all [`Member`](crate::team::Member)s that are flagged as action performers.
+    ///
+    /// # Notes
+    ///
+    /// It must not be expected for the iterator of this function to have any particular ordering.
+    ///
+    /// The result of this function depends on the [`Target`]s passed as input in the [`Context`] struct.
+    /// If members are not placed where the [`MemberIdentifier`]s are pointing to, either the wrong member
+    /// is going to be returned, or no reference will be returned. Beware of the [`Team`]'s ordering.
     pub fn performers(&'s mut self) -> MemberIter<'i, 's> {
         self.target_iter(self.performers.clone())
     }
 
+    /// Returns a mutable iterator over all [`Member`](crate::team::Member)s that are flagged as action targets.
+    ///
+    /// # Notes
+    ///
+    /// It must not be expected for the iterator of this function to have any particular ordering.
+    ///
+    /// The result of this function depends on the [`Target`]s passed as input in the [`Context`] struct.
+    /// If members are not placed where the [`MemberIdentifier`]s are pointing to, either the wrong member
+    /// is going to be returned, or no reference will be returned. Beware of the [`Team`]'s ordering.
     pub fn targets(&'s mut self) -> MemberIter<'i, 's> {
         self.target_iter(self.targets.clone())
     }
@@ -53,14 +71,18 @@ impl<'i, 's: 'i, 'team: 'i> Context<'team> {
     fn target_iter(&'s mut self, target: Target) -> MemberIter<'i, 's> {
         match target {
             // Return a `Once` iterator to the single member that is targeted.
-            // TODO: just return None if the member is not found, like the other iterators.
-            Target::Single(id) => Box::new(std::iter::once(
-                self.team_list
-                    .get_mut(id.team_id)
-                    .expect("could not find target team")
-                    .member_mut(id.member_id)
-                    .expect("could not find target member"),
-            )),
+            Target::Single(id) => {
+                let team = self.team_list.get_mut(id.team_id);
+
+                if let Some(t) = team {
+                    if let Some(m) = t.member_mut(id.member_id) {
+                        return Box::new(std::iter::once(m));
+                    }
+                }
+
+                // If the member wasn't found, return an empty iterator.
+                Box::new(std::iter::empty())
+            }
             // Return a filtered iterator over all individual targets.
             Target::DiscreteMultiple(targets) => Box::new(
                 self.team_list
@@ -80,7 +102,7 @@ impl<'i, 's: 'i, 'team: 'i> Context<'team> {
                     })
                     .map(|(_, (_, m))| m),
             ),
-            // Return an iterator that iterates over every member of a single team.
+            // Returns an iterator that iterates over every member of a single team.
             Target::FullTeam { team_id } => Box::new(
                 self.team_list
                     .get_mut(team_id)
@@ -88,7 +110,7 @@ impl<'i, 's: 'i, 'team: 'i> Context<'team> {
                     .member_list_mut()
                     .iter_mut(),
             ),
-            // Return an iterator that iterates over every member of every team. It's pretty simple with `flat_map()`.
+            // Returns an iterator that iterates over every member of every team. It's pretty simple with `flat_map()`.
             Target::All => Box::new(
                 self.team_list
                     .iter_mut()
