@@ -1,27 +1,27 @@
 use crate::{
     action::{Action, Context, Target},
-    member::{Member, MemberIdentifier},
+    member::{Member, MemberIdentifier, Properties, Statistics},
     team::Team,
 };
 
-pub type ChoiceReturn = (Box<dyn Action>, Target, Target);
-pub type ChoiceCallback = dyn Fn() -> ChoiceReturn;
+pub type ChoiceReturn<M, S, P> = (Box<dyn Action<M, S, P>>, Target, Target);
+pub type ChoiceCallback<M, S, P> = Box<dyn Fn() -> ChoiceReturn<M, S, P>>;
 
 /// Instance of a unique fight between multiple [`Team`]s.
-pub struct Battle {
+pub struct Battle<M: Member<S, P>, S: Statistics, P: Properties> {
     /// List of all teams involved in the battle.
-    team_list: Vec<Team>,
+    team_list: Vec<Team<M, S, P>>,
     #[allow(dead_code)]
     startup: Option<StartupInfo>,
     /// Turn system in charge of handling turns and actions of the battle.
     turn_system: TurnSystem,
     /// Current battle state.
     state: State,
-    action_choice_callback: Box<ChoiceCallback>,
+    action_choice_callback: ChoiceCallback<M, S, P>,
 }
 
-pub struct Builder {
-    inner: Battle,
+pub struct Builder<M: Member<S, P>, S: Statistics, P: Properties> {
+    inner: Battle<M, S, P>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -46,11 +46,11 @@ pub enum State {
     Finished,
 }
 
-impl Builder {
+impl<M: Member<S, P>, S: Statistics, P: Properties> Builder<M, S, P> {
     pub fn new(
-        team_list: Vec<Team>,
+        team_list: Vec<Team<M, S, P>>,
         startup: Option<StartupInfo>,
-        action_choice_callback: Box<ChoiceCallback>,
+        action_choice_callback: ChoiceCallback<M, S, P>,
         end_condition: EndCondition,
     ) -> Self {
         Self {
@@ -64,12 +64,12 @@ impl Builder {
         }
     }
 
-    pub fn build(self) -> Battle {
+    pub fn build(self) -> Battle<M, S, P> {
         self.inner
     }
 }
 
-impl Battle {
+impl<M: Member<S, P>, S: Statistics, P: Properties> Battle<M, S, P> {
     /// Runs a [`Battle`] to completion, returning the final state of the battling teams.
     ///
     /// The winner will be declared by the end of this function.
@@ -77,7 +77,7 @@ impl Battle {
     /// # Panics
     ///
     /// The function will panic if no turn system was internally initialized, or if any conditions for which [`TurnSystem::play_turn()`] would panic occour.
-    pub fn run(mut self) -> Vec<Team> {
+    pub fn run(mut self) -> Vec<Team<M, S, P>> {
         loop {
             self.state = self
                 .turn_system
@@ -116,16 +116,19 @@ impl TurnSystem {
             end_condition,
         }
     }
+}
 
+// TurnSystem functionality that requires access to teams and members.
+impl TurnSystem {
     /// Simulate one turn of the battle.
     ///
     /// # Panics
     ///
     /// The function will panic if the turn counter overflows `u64::MAX` or if teams/members are not found when specified.
-    pub fn play_turn(
+    pub fn play_turn<M: Member<S, P>, S: Statistics, P: Properties>(
         &mut self,
-        team_list: &mut Vec<Team>,
-        action_choice_callback: &ChoiceCallback,
+        team_list: &mut Vec<Team<M, S, P>>,
+        action_choice_callback: &ChoiceCallback<M, S, P>,
     ) -> State {
         // Count the new turn
         self.turn_number = self
@@ -175,7 +178,10 @@ impl TurnSystem {
     }
 
     /// Returns whether or not the battle should continue.
-    fn check_end_condition(&self, team_list: &[Team]) -> bool {
+    fn check_end_condition<M: Member<S, P>, S: Statistics, P: Properties>(
+        &self,
+        team_list: &[Team<M, S, P>],
+    ) -> bool {
         match self.end_condition {
             EndCondition::LastMemberStanding => {
                 let mut members_alive: u8 = 0;
@@ -219,7 +225,10 @@ impl TurnSystem {
         }
     }
 
-    fn find_next_player(&mut self, team_list: &[Team]) -> Option<MemberIdentifier> {
+    fn find_next_player<M: Member<S, P>, S: Statistics, P: Properties>(
+        &mut self,
+        team_list: &[Team<M, S, P>],
+    ) -> Option<MemberIdentifier> {
         for (team_id, team) in cycle_from_point_enumerated(team_list, self.playing_member.team_id) {
             for (member_id, member) in
                 cycle_from_point_enumerated(team.member_list(), team.member_list().len())

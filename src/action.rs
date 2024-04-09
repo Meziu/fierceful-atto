@@ -1,4 +1,4 @@
-use crate::member::{MemberIdentifier, MemberIter};
+use crate::member::{Member, MemberIdentifier, Properties, Statistics};
 use crate::team::Team;
 
 /// Action that can be performed by team members that affects a specified target.
@@ -7,9 +7,9 @@ use crate::team::Team;
 ///
 /// More than one member may be appointed as "action performers".
 /// Even members of different teams or whole teams can perform the same action together!
-pub trait Action {
+pub trait Action<M: Member<S, P>, S: Statistics, P: Properties> {
     ///
-    fn act(&mut self, context: Context<'_>);
+    fn act(&mut self, context: Context<'_, M, S, P>);
 }
 
 /// Single or multiple targets being affected by an action.
@@ -31,14 +31,18 @@ pub enum Target {
     All,
 }
 
-pub struct Context<'team> {
-    team_list: &'team mut Vec<Team>,
+pub struct Context<'team, M: Member<S, P>, S: Statistics, P: Properties> {
+    team_list: &'team mut Vec<Team<M, S, P>>,
     performers: Target,
     targets: Target,
 }
 
-impl<'i, 's: 'i, 'team: 'i> Context<'team> {
-    pub fn new(team_list: &'team mut Vec<Team>, performers: Target, targets: Target) -> Self {
+impl<'i, 's: 'i, 'team: 'i, M: Member<S, P>, S: Statistics, P: Properties> Context<'team, M, S, P> {
+    pub fn new(
+        team_list: &'team mut Vec<Team<M, S, P>>,
+        performers: Target,
+        targets: Target,
+    ) -> Self {
         Self {
             team_list,
             performers,
@@ -55,7 +59,7 @@ impl<'i, 's: 'i, 'team: 'i> Context<'team> {
     /// The result of this function depends on the [`Target`]s passed as input in the [`Context`] struct.
     /// If members are not placed where the [`MemberIdentifier`]s are pointing to, either the wrong member
     /// is going to be returned, or no reference will be returned. Beware of the [`Team`]'s ordering.
-    pub fn performers(&'s mut self) -> MemberIter<'i, 's> {
+    pub fn performers(&'s mut self) -> Box<dyn Iterator<Item = &'s mut M> + 'i> {
         self.target_iter(self.performers.clone())
     }
 
@@ -68,12 +72,12 @@ impl<'i, 's: 'i, 'team: 'i> Context<'team> {
     /// The result of this function depends on the [`Target`]s passed as input in the [`Context`] struct.
     /// If members are not placed where the [`MemberIdentifier`]s are pointing to, either the wrong member
     /// is going to be returned, or no reference will be returned. Beware of the [`Team`]'s ordering.
-    pub fn targets(&'s mut self) -> MemberIter<'i, 's> {
+    pub fn targets(&'s mut self) -> Box<dyn Iterator<Item = &'s mut M> + 'i> {
         self.target_iter(self.targets.clone())
     }
 
     /// Function that iterates over all members targeted.
-    fn target_iter(&'s mut self, target: Target) -> MemberIter<'i, 's> {
+    fn target_iter(&'s mut self, target: Target) -> Box<dyn Iterator<Item = &'s mut M> + 'i> {
         match target {
             // Return a `Once` iterator to the single member that is targeted.
             Target::Single(id) => {
