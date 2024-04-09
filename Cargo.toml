@@ -1,6 +1,9 @@
 [package]
 name = "fierceful-atto"
 version = "0.1.0"
+description = "Modular battle system for turn-based RPGs"
+repository = "https://github.com/meziu/fierceful-atto"
+license = "MIT OR Apache-2.0"
 edition = "2021"
 
 [dependencies]
