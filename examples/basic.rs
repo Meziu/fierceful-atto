@@ -3,7 +3,7 @@ use fierceful_atto::battle::{self, ChoiceReturn, EndCondition};
 use fierceful_atto::member::{Member, MemberIdentifier, Properties, Statistics};
 use fierceful_atto::team::Team;
 
-// Example of a simple action that inficts direct damage on targets.
+// Example of a simple action that inflicts direct damage on targets.
 struct BasicAttack;
 
 impl Action<Player, Stats, Props> for BasicAttack {
