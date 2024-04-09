@@ -17,11 +17,19 @@ pub trait Member<S: Statistics, P: Properties>: core::fmt::Debug + Clone + Parti
     // `Properties` and `Statistics` function escalation (to access them directly via `Member`).
 
     /// Returns this [`Member`]'s current health.
+    ///
+    /// # Notes
+    ///
+    /// This is a blanket implementation over [`Properties::health()`].
     fn health(&self) -> u64 {
         self.properties().health()
     }
 
-    /// Returns this [`Member`]'s current health.
+    /// Inflict direct damage to this [`Member`]'s health.
+    ///
+    /// # Notes
+    ///
+    /// This is a blanket implementation over [`Properties::damage()`].
     fn damage(&mut self, damage: u64) {
         self.properties_mut().damage(damage);
     }

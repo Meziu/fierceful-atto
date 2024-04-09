@@ -16,7 +16,7 @@ impl Action<Player, Stats, Props> for BasicAttack {
         }
 
         for t in context.targets() {
-            // Unleash the combined damage on a single target.
+            // Unleash the combined damage on all targets.
             t.damage(damage_sum);
 
             println!(
@@ -93,8 +93,8 @@ impl Props {
 }
 
 impl Properties for Props {
-    fn health(&self) -> &u64 {
-        &self.health
+    fn health(&self) -> u64 {
+        self.health
     }
 
     fn health_mut(&mut self) -> &mut u64 {
