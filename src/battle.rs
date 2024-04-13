@@ -73,10 +73,6 @@ impl<M: Member<S, P>, S: Statistics, P: Properties> Battle<M, S, P> {
     /// Runs a [`Battle`] to completion, returning the final state of the battling teams.
     ///
     /// The winner will be declared by the end of this function.
-    ///
-    /// # Panics
-    ///
-    /// The function will panic if no turn system was internally initialized, or if any conditions for which [`TurnSystem::play_turn()`] would panic occour.
     pub fn run(mut self) -> Vec<Team<M, S, P>> {
         loop {
             self.state = self
@@ -166,7 +162,7 @@ impl TurnSystem {
             return State::Finished;
         }
 
-        // TODO: custom performer finder (does it even make sense with the "everyone" can perform model? maybe just as default behaviour for a more modular system)
+        // TODO: custom performer finder (does it even make sense with the "everyone can perform" model? maybe just as default behaviour for a more modular system)
         match self.find_next_player(team_list) {
             Some(m) => {
                 self.playing_member = m;

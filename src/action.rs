@@ -8,7 +8,13 @@ use crate::team::Team;
 /// More than one member may be appointed as "action performers".
 /// Even members of different teams or whole teams can perform the same action together!
 pub trait Action<M: Member<S, P>, S: Statistics, P: Properties> {
+    /// Action logic performer.
     ///
+    /// # Notes
+    ///
+    /// Depending on the action, you may need to damage the interested targets or modify their status.
+    /// You may want to iterate over all performers and targets to retrieve the
+    /// necessary data by using [`Context::performers()`] or [`Context::targets()`].
     fn act(&mut self, context: Context<'_, M, S, P>);
 }
 
