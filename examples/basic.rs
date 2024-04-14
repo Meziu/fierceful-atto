@@ -82,10 +82,9 @@ impl Member<Stats, Props> for Player {
     }
 }
 
-// TODO: Should remove if I want to require `From<S: Statistics>`
-impl Props {
+impl From<Stats> for Props {
     /// Auto-generate a new set of [`Props`] from some [`Stats`].
-    pub fn from_stats(statistics: &Stats) -> Self {
+    fn from(statistics: Stats) -> Self {
         Self {
             health: statistics.max_health,
         }
@@ -108,16 +107,8 @@ fn main() {
     let picco_stats = Stats::new(100, 15);
     let bacco_stats = Stats::new(150, 12);
 
-    let player_1 = Player::new(
-        String::from("Picco"),
-        picco_stats,
-        Props::from_stats(&picco_stats),
-    );
-    let player_2 = Player::new(
-        String::from("Bacco"),
-        bacco_stats,
-        Props::from_stats(&bacco_stats),
-    );
+    let player_1 = Player::new(String::from("Picco"), picco_stats, Props::from(picco_stats));
+    let player_2 = Player::new(String::from("Bacco"), bacco_stats, Props::from(bacco_stats));
 
     let teams = vec![
         Team::new(String::from("Strong Ones"), vec![player_1]),
