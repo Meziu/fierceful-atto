@@ -60,7 +60,7 @@ impl<'i, 's: 'i, 'team: 'i, M: Member<S, P>, S: Statistics, P: Properties> Conte
     ///
     /// # Notes
     ///
-    /// It must not be expected for the iterator of this function to have any particular ordering.
+    /// It must not be expected for this iterator to return references in any particular order.
     ///
     /// The result of this function depends on the [`Target`]s passed as input in the [`Context`] struct.
     /// If members are not placed where the [`MemberIdentifier`]s are pointing to, either the wrong member
@@ -73,7 +73,7 @@ impl<'i, 's: 'i, 'team: 'i, M: Member<S, P>, S: Statistics, P: Properties> Conte
     ///
     /// # Notes
     ///
-    /// It must not be expected for the iterator of this function to have any particular ordering.
+    /// It must not be expected for this iterator to return references in any particular order.
     ///
     /// The result of this function depends on the [`Target`]s passed as input in the [`Context`] struct.
     /// If members are not placed where the [`MemberIdentifier`]s are pointing to, either the wrong member
@@ -94,6 +94,8 @@ impl<'i, 's: 'i, 'team: 'i, M: Member<S, P>, S: Statistics, P: Properties> Conte
                         return Box::new(std::iter::once(m));
                     }
                 }
+
+                log::warn!("Could not find requested member at index {:?}. Returning an empty iterator instead", id);
 
                 // If the member wasn't found, return an empty iterator.
                 Box::new(std::iter::empty())
@@ -118,13 +120,14 @@ impl<'i, 's: 'i, 'team: 'i, M: Member<S, P>, S: Statistics, P: Properties> Conte
                     .map(|(_, (_, m))| m),
             ),
             // Returns an iterator that iterates over every member of a single team.
-            Target::FullTeam { team_id } => Box::new(
-                self.team_list
-                    .get_mut(team_id)
-                    .expect("could not find target team")
-                    .member_list_mut()
-                    .iter_mut(),
-            ),
+            Target::FullTeam { team_id } => match self.team_list.get_mut(team_id) {
+                Some(team) => Box::new(team.member_list_mut().iter_mut()),
+                None => {
+                    log::warn!("Could not find requested team at index {}. Returning an empty iterator instead", team_id);
+
+                    Box::new(std::iter::empty())
+                }
+            },
             // Returns an iterator that iterates over every member of every team. It's pretty simple with `flat_map()`.
             Target::All => Box::new(
                 self.team_list

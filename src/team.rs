@@ -9,16 +9,21 @@ use crate::member::{Member, Properties, Statistics};
 pub struct Team<M: Member<S, P>, S: Statistics, P: Properties> {
     name: String,
     member_list: Vec<M>,
-    type_costraints: PhantomData<(S, P)>,
+    datatypes: PhantomData<(S, P)>,
 }
 
 impl<M: Member<S, P>, S: Statistics, P: Properties> Team<M, S, P> {
     /// Create a new [`Team`] object using a list of members associated to it.
     pub fn new(name: String, member_list: Vec<M>) -> Self {
+        log::debug!(
+            "Team \"{name}\" was created with {} member(s)",
+            member_list.len()
+        );
+
         Self {
             name,
             member_list,
-            type_costraints: PhantomData,
+            datatypes: PhantomData,
         }
     }
 

@@ -5,7 +5,9 @@ use crate::{
 };
 
 pub type ChoiceReturn<M, S, P> = (Box<dyn Action<M, S, P>>, Target, Target);
-pub type ChoiceCallback<M, S, P> = Box<dyn Fn() -> ChoiceReturn<M, S, P>>;
+/// Function type to dynamically decide the next [`Action`] to perform.
+pub type ChoiceCallback<M, S, P> =
+    Box<dyn Fn(&[Team<M, S, P>], MemberIdentifier) -> ChoiceReturn<M, S, P>>;
 
 /// Instance of a unique fight between multiple [`Team`]s.
 pub struct Battle<M: Member<S, P>, S: Statistics, P: Properties> {
@@ -74,12 +76,18 @@ impl<M: Member<S, P>, S: Statistics, P: Properties> Battle<M, S, P> {
     ///
     /// The winner will be declared by the end of this function.
     pub fn run(mut self) -> Vec<Team<M, S, P>> {
+        log::info!("The battle has started and will run until its conclusion");
+
         loop {
             self.state = self
                 .turn_system
                 .play_turn(&mut self.team_list, &self.action_choice_callback);
 
             if let State::Finished = self.state {
+                log::info!(
+                    "The battle has concluded after {} turns",
+                    self.turn_system.turn_number
+                );
                 break;
             }
         }
@@ -127,28 +135,55 @@ impl TurnSystem {
         action_choice_callback: &ChoiceCallback<M, S, P>,
     ) -> State {
         // Count the new turn
-        self.turn_number = self
-            .turn_number
-            .checked_add(1)
-            .expect("turn counter overflowed");
+        self.turn_number = match self.turn_number.checked_add(1) {
+            Some(t) => t,
+            None => {
+                log::error!("Turn counter overflowed after {} turns", self.turn_number);
 
-        println!("Playing turn number {}.", self.turn_number);
+                panic!("turn counter overflowed");
+            }
+        };
+
+        log::info!("Playing turn number {}.", self.turn_number);
 
         // Get the playing team.
-        let playing_team = team_list
-            .get(self.playing_member.team_id)
-            .expect("playing team was not found");
+        let playing_team = match team_list.get(self.playing_member.team_id) {
+            Some(pt) => pt,
+            None => {
+                log::error!(
+                    "Playing team with id {:?} was not found",
+                    self.playing_member.team_id
+                );
 
-        println!("Plays the team \"{}\"", playing_team.name());
+                panic!(
+                    "requested team with id {} was not found",
+                    self.playing_member.team_id
+                );
+            }
+        };
+
+        log::info!("Plays the team \"{}\"", playing_team.name());
 
         // Get the "active" player of this turn.
-        let playing_member = playing_team
-            .member(self.playing_member.member_id)
-            .expect("playing member was not found");
+        let playing_member = match playing_team.member(self.playing_member.member_id) {
+            Some(pm) => pm,
+            None => {
+                log::error!(
+                    "Playing member with id {:?} was not found",
+                    self.playing_member
+                );
 
-        println!("It's the turn of {}", playing_member.name());
+                panic!(
+                    "requested member with id {} was not found",
+                    self.playing_member.member_id
+                );
+            }
+        };
 
-        let (mut action, performers, targets) = action_choice_callback();
+        log::info!("It's the turn of {}", playing_member.name());
+
+        let (mut action, performers, targets) =
+            action_choice_callback(&team_list, self.playing_member);
 
         // Setup the chosen action
         let context = Context::new(team_list, performers, targets);
@@ -226,9 +261,13 @@ impl TurnSystem {
         team_list: &[Team<M, S, P>],
     ) -> Option<MemberIdentifier> {
         for (team_id, team) in cycle_from_point_enumerated(team_list, self.playing_member.team_id) {
-            for (member_id, member) in
-                cycle_from_point_enumerated(team.member_list(), team.member_list().len())
-            {
+            let skip = if self.playing_member.team_id == team_id {
+                self.playing_member.member_id + 1
+            } else {
+                0
+            };
+
+            for (member_id, member) in team.member_list().iter().enumerate().skip(skip) {
                 if member.health() != 0 {
                     return Some(MemberIdentifier { team_id, member_id });
                 }

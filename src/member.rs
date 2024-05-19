@@ -14,7 +14,7 @@ pub trait Member<S: Statistics, P: Properties>: core::fmt::Debug + Clone + Parti
     /// Returns a mutable reference to this [`Member`]'s properties.
     fn properties_mut(&mut self) -> &mut P;
 
-    // `Properties` and `Statistics` function escalation (to access them directly via `Member`).
+    // `Properties` and `Statistics` function escalation (to access them directly via `Member` with additional information).
 
     /// Returns this [`Member`]'s current health.
     ///
@@ -32,6 +32,14 @@ pub trait Member<S: Statistics, P: Properties>: core::fmt::Debug + Clone + Parti
     /// This is a blanket implementation over [`Properties::damage()`].
     fn damage(&mut self, damage: u64) {
         self.properties_mut().damage(damage);
+
+        log::info!(
+            "Member {} takes {} damage! Health: {}/{}",
+            self.name(),
+            damage,
+            self.properties().health(),
+            self.statistics().reference_health(),
+        );
     }
 }
 
@@ -42,7 +50,12 @@ pub trait Member<S: Statistics, P: Properties>: core::fmt::Debug + Clone + Parti
 /// # Notes
 ///
 /// Use [`Properties`] to keep track and calculate modifiers on these statistics.
-pub trait Statistics: core::fmt::Debug + Clone + PartialEq + Eq {}
+pub trait Statistics: core::fmt::Debug + Clone + PartialEq + Eq {
+    /// Amount of health to compare the "current" amount to.
+    ///
+    /// This is useful for UIs, game logic or general info. Usually it's supposed to be the "max" health, or some similar value.
+    fn reference_health(&self) -> u64;
+}
 
 /// Properties of a [`Member`] that can change during a match.
 ///

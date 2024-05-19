@@ -18,14 +18,6 @@ impl Action<Player, Stats, Props> for BasicAttack {
         for t in context.targets() {
             // Unleash the combined damage on all targets.
             t.damage(damage_sum);
-
-            println!(
-                "Member {} takes {} damage! Health: {}/{}",
-                t.name(),
-                damage_sum,
-                t.health(),
-                t.statistics().max_health
-            );
         }
     }
 }
@@ -101,9 +93,31 @@ impl Properties for Props {
     }
 }
 
-impl Statistics for Stats {}
+impl Statistics for Stats {
+    fn reference_health(&self) -> u64 {
+        self.max_health
+    }
+}
 
 fn main() {
+    // Setup logging using fern.
+    let logger_dispatch = fern::Dispatch::new()
+        .format(|out, message, record| {
+            out.finish(format_args!(
+                "[{} {} {}] {}",
+                humantime::format_rfc3339_seconds(std::time::SystemTime::now()),
+                record.level(),
+                record.target(),
+                message
+            ))
+        })
+        .level(log::LevelFilter::Debug)
+        .chain(std::io::stdout());
+
+    if logger_dispatch.apply().is_err() {
+        eprintln!("could not setup logger. log information will not be retrieved")
+    }
+
     let picco_stats = Stats::new(100, 15);
     let bacco_stats = Stats::new(150, 12);
 
@@ -133,11 +147,23 @@ fn main() {
     println!("After battle: {resulting_teams:#?}");
 }
 
-fn action_choice() -> ChoiceReturn<Player, Stats, Props> {
-    // TODO: Make this an actual choice (or maybe based on the turn?).
+fn action_choice(
+    team_list: &[Team<Player, Stats, Props>],
+    hint_performer: MemberIdentifier,
+) -> ChoiceReturn<Player, Stats, Props> {
+    let mut target = MemberIdentifier::zeroed();
+
+    for (t_id, t) in team_list.iter().enumerate() {
+        if t_id != hint_performer.team_id {
+            for (m_id, _) in t.member_list().iter().enumerate() {
+                target = MemberIdentifier::new(t_id, m_id);
+            }
+        }
+    }
+
     (
         Box::new(BasicAttack),
-        Target::Single(MemberIdentifier::new(0, 0)),
-        Target::Single(MemberIdentifier::new(1, 0)),
+        Target::Single(hint_performer),
+        Target::Single(target),
     )
 }
