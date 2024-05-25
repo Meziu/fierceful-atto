@@ -9,7 +9,7 @@ use crate::member::{Member, Properties, Statistics};
 pub struct Team<M: Member<S, P>, S: Statistics, P: Properties> {
     name: String,
     member_list: Vec<M>,
-    datatypes: PhantomData<(S, P)>,
+    member_types: PhantomData<(S, P)>,
 }
 
 impl<M: Member<S, P>, S: Statistics, P: Properties> Team<M, S, P> {
@@ -23,7 +23,7 @@ impl<M: Member<S, P>, S: Statistics, P: Properties> Team<M, S, P> {
         Self {
             name,
             member_list,
-            datatypes: PhantomData,
+            member_types: PhantomData,
         }
     }
 

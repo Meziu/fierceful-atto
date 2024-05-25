@@ -1,4 +1,4 @@
-//! Definitions for [`Member`]s, the main actors in a [`Battle`](crate::battle::Battle).
+//! Definitions for [`Member`]s, the main performers in a [`Battle`](crate::battle::Battle).
 
 /// Fighting entity of a [`Team`](crate::team::Team).
 pub trait Member<S: Statistics, P: Properties>: core::fmt::Debug + Clone + PartialEq + Eq {

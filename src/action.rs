@@ -1,6 +1,11 @@
 use crate::member::{Member, MemberIdentifier, Properties, Statistics};
 use crate::team::Team;
 
+pub type ChoiceReturn<M, S, P> = (Box<dyn Action<M, S, P>>, Target, Target);
+/// Function type to dynamically decide the next [`Action`] to perform.
+pub type ChoiceCallback<M, S, P> =
+    Box<dyn Fn(&[Team<M, S, P>], Option<MemberIdentifier>) -> ChoiceReturn<M, S, P>>;
+
 /// Action that can be performed by team members that affects a specified target.
 ///
 /// # Notes

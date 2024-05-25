@@ -1,5 +1,5 @@
-use fierceful_atto::action::{Action, Context, Target};
-use fierceful_atto::battle::{self, ChoiceReturn, EndCondition};
+use fierceful_atto::action::{Action, ChoiceReturn, Context, Target};
+use fierceful_atto::battle::{self, EndCondition};
 use fierceful_atto::member::{Member, MemberIdentifier, Properties, Statistics};
 use fierceful_atto::team::Team;
 
@@ -149,8 +149,11 @@ fn main() {
 
 fn action_choice(
     team_list: &[Team<Player, Stats, Props>],
-    hint_performer: MemberIdentifier,
+    hint_performer: Option<MemberIdentifier>,
 ) -> ChoiceReturn<Player, Stats, Props> {
+    // It should never be `None` in our example, but lets avoid panicking nontheless.
+    let hint_performer = hint_performer.unwrap_or_default();
+
     let mut target = MemberIdentifier::zeroed();
 
     for (t_id, t) in team_list.iter().enumerate() {
