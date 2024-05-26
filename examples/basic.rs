@@ -1,26 +1,10 @@
-use fierceful_atto::action::{Action, ChoiceReturn, Context, Target};
+use fierceful_atto::action::{ChoiceReturn, Target};
 use fierceful_atto::battle::{self, EndCondition};
 use fierceful_atto::member::{Member, MemberIdentifier, Properties, Statistics};
 use fierceful_atto::team::Team;
 
-// Example of a simple action that inflicts direct damage on targets.
-struct BasicAttack;
-
-impl Action<Player, Stats, Props> for BasicAttack {
-    fn act(&mut self, mut context: Context<Player, Stats, Props>) {
-        let mut damage_sum: u64 = 0;
-
-        for p in context.performers() {
-            // Calculate the sum of all performers' attacks.
-            damage_sum = damage_sum.saturating_add(p.statistics().attack);
-        }
-
-        for t in context.targets() {
-            // Unleash the combined damage on all targets.
-            t.damage(damage_sum);
-        }
-    }
-}
+// We will use the `DirectAttack` type from the pre-made catalogue to inflict direct damage on our foes.
+use fierceful_atto::catalogue::actions::DirectAttack;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Player {
@@ -42,17 +26,21 @@ impl Player {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Stats {
     pub max_health: u64,
-    pub attack: u64,
+    pub base_attack: u64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Props {
     pub health: u64,
+    pub attack: u64,
 }
 
 impl Stats {
-    pub fn new(max_health: u64, attack: u64) -> Self {
-        Self { max_health, attack }
+    pub fn new(max_health: u64, base_attack: u64) -> Self {
+        Self {
+            max_health,
+            base_attack,
+        }
     }
 }
 
@@ -79,6 +67,7 @@ impl From<Stats> for Props {
     fn from(statistics: Stats) -> Self {
         Self {
             health: statistics.max_health,
+            attack: statistics.base_attack,
         }
     }
 }
@@ -91,11 +80,19 @@ impl Properties for Props {
     fn health_mut(&mut self) -> &mut u64 {
         &mut self.health
     }
+
+    fn attack(&self) -> u64 {
+        self.attack
+    }
 }
 
 impl Statistics for Stats {
     fn reference_health(&self) -> u64 {
         self.max_health
+    }
+
+    fn base_attack(&self) -> u64 {
+        self.base_attack
     }
 }
 
@@ -165,7 +162,7 @@ fn action_choice(
     }
 
     (
-        Box::new(BasicAttack),
+        Box::new(DirectAttack),
         Target::Single(hint_performer),
         Target::Single(target),
     )

@@ -55,6 +55,11 @@ pub trait Statistics: core::fmt::Debug + Clone + PartialEq + Eq {
     ///
     /// This is useful for UIs, game logic or general info. Usually it's supposed to be the "max" health, or some similar value.
     fn reference_health(&self) -> u64;
+
+    /// Attack value associated to a [`Member`].
+    ///
+    /// This attack value is supposed to be the "base" attack deeply associated with a member's statistics.
+    fn base_attack(&self) -> u64;
 }
 
 /// Properties of a [`Member`] that can change during a match.
@@ -63,6 +68,12 @@ pub trait Statistics: core::fmt::Debug + Clone + PartialEq + Eq {
 pub trait Properties: core::fmt::Debug + Clone + PartialEq + Eq {
     fn health(&self) -> u64;
     fn health_mut(&mut self) -> &mut u64;
+
+    /// Attack value used to damage foes.
+    ///
+    /// This attack value shouldn't be the "base" attack, but the value actually used to inflict damage after all needed
+    /// calculations are applied (like statistic's boosts).
+    fn attack(&self) -> u64;
 
     /// Auto-generate a new set of [`Properties`] from some [`Statistics`].
     // TODO: Require From<Statistics>
