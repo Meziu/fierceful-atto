@@ -2,7 +2,11 @@
 
 use crate::member::Member;
 
+#[cfg(feature = "serde")]
+use serde::{Serialize, Deserialize};
+
 /// Coalition made up of multiple fighting [`Member`]s.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Team<M> {
     name: String,
