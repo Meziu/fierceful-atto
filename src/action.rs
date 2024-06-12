@@ -1,10 +1,9 @@
-use crate::member::{Member, MemberIdentifier, Properties, Statistics};
+use crate::member::{Member, MemberIdentifier};
 use crate::team::Team;
 
-pub type ChoiceReturn<M, S, P> = (Box<dyn Action<M, S, P>>, Target, Target);
+pub type ChoiceReturn<M> = (Box<dyn Action<M>>, Target, Target);
 /// Function type to dynamically decide the next [`Action`] to perform.
-pub type ChoiceCallback<M, S, P> =
-    Box<dyn Fn(&[Team<M, S, P>], Option<MemberIdentifier>) -> ChoiceReturn<M, S, P>>;
+pub type ChoiceCallback<M> = Box<dyn Fn(&[Team<M>], Option<MemberIdentifier>) -> ChoiceReturn<M>>;
 
 /// Action that can be performed by team members that affects a specified target.
 ///
@@ -12,7 +11,7 @@ pub type ChoiceCallback<M, S, P> =
 ///
 /// More than one member may be appointed as "action performers".
 /// Even members of different teams or whole teams can perform the same action together!
-pub trait Action<M: Member<S, P>, S: Statistics, P: Properties> {
+pub trait Action<M> {
     /// Action logic performer.
     ///
     /// # Notes
@@ -20,7 +19,7 @@ pub trait Action<M: Member<S, P>, S: Statistics, P: Properties> {
     /// Depending on the action, you may need to damage the interested targets or modify their status.
     /// You may want to iterate over all performers and targets to retrieve the
     /// necessary data by using [`Context::performers()`] or [`Context::targets()`].
-    fn act(&mut self, context: Context<'_, M, S, P>);
+    fn act(&mut self, context: Context<'_, M>);
 }
 
 /// Single or multiple targets being affected by an action.
@@ -42,18 +41,14 @@ pub enum Target {
     All,
 }
 
-pub struct Context<'team, M: Member<S, P>, S: Statistics, P: Properties> {
-    team_list: &'team mut Vec<Team<M, S, P>>,
+pub struct Context<'team, M> {
+    team_list: &'team mut Vec<Team<M>>,
     performers: Target,
     targets: Target,
 }
 
-impl<'i, 's: 'i, 'team: 'i, M: Member<S, P>, S: Statistics, P: Properties> Context<'team, M, S, P> {
-    pub fn new(
-        team_list: &'team mut Vec<Team<M, S, P>>,
-        performers: Target,
-        targets: Target,
-    ) -> Self {
+impl<'i, 's: 'i, 'team: 'i, M: Member> Context<'team, M> {
+    pub fn new(team_list: &'team mut Vec<Team<M>>, performers: Target, targets: Target) -> Self {
         Self {
             team_list,
             performers,

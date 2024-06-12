@@ -1,7 +1,7 @@
 //! Pre-made actions using generic implementation for all needs.
 
 use crate::action::{Action, Context};
-use crate::member::{Member, Properties, Statistics};
+use crate::member::{Member, Properties};
 
 /// Simple action that inflicts direct damage on targets.
 ///
@@ -13,8 +13,8 @@ use crate::member::{Member, Properties, Statistics};
 /// If multiple members are appointed as targets, each will be damaged by the *total* of the summed attack.
 pub struct DirectAttack;
 
-impl<M: Member<S, P>, S: Statistics, P: Properties> Action<M, S, P> for DirectAttack {
-    fn act(&mut self, mut context: Context<M, S, P>) {
+impl<M: Member> Action<M> for DirectAttack {
+    fn act(&mut self, mut context: Context<M>) {
         let mut damage_sum: u64 = 0;
 
         for p in context.performers() {

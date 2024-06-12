@@ -1,16 +1,14 @@
 //! Helper module to search for special conditions in battles and teams.
 
-use std::marker::PhantomData;
-
-use crate::member::{Member, MemberIdentifier, Properties, Statistics};
+use crate::member::{Member, MemberIdentifier};
 use crate::team::Team;
 
 pub type FilterCriteria<M> = dyn Fn(MemberIdentifier, &M) -> bool;
 
 #[non_exhaustive]
-pub enum SuggestedPerformerCriteria<M: Member<S, P>, S: Statistics, P: Properties> {
+pub enum SuggestedPerformerCriteria<M> {
     /// Suggests no performer every time.
-    None(PhantomData<(S, P)>),
+    None,
     /// Suggests the given member ID every time.
     Constant(MemberIdentifier),
     /// If possible, chooses the next "alive" member (`health > 0`) of the currently acting member's team.
@@ -28,14 +26,14 @@ pub enum SuggestedPerformerCriteria<M: Member<S, P>, S: Statistics, P: Propertie
 }
 
 // TODO: remove yucky code duplication
-impl<M: Member<S, P>, S: Statistics, P: Properties> SuggestedPerformerCriteria<M, S, P> {
+impl<M: Member> SuggestedPerformerCriteria<M> {
     pub fn search(
         &self,
         current_playing_member: Option<MemberIdentifier>,
-        team_list: &[Team<M, S, P>],
+        team_list: &[Team<M>],
     ) -> Option<MemberIdentifier> {
         match self {
-            Self::None(_) => return None,
+            Self::None => return None,
             Self::Constant(member) => return Some(*member),
             Self::CycleAlive => {
                 let current_playing_member = current_playing_member.unwrap_or_default();

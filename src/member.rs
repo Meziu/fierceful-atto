@@ -1,18 +1,21 @@
 //! Definitions for [`Member`]s, the main performers in a [`Battle`](crate::battle::Battle).
 
 /// Fighting entity of a [`Team`](crate::team::Team).
-pub trait Member<S: Statistics, P: Properties>: core::fmt::Debug + Clone + PartialEq + Eq {
+pub trait Member: core::fmt::Debug + Clone + PartialEq + Eq {
+    type Statistics: Statistics;
+    type Properties: Properties;
+
     /// Returns this [`Member`]'s name.
     fn name(&self) -> &str;
 
     /// Returns a reference to this [`Member`]'s statistics.
-    fn statistics(&self) -> &S;
+    fn statistics(&self) -> &Self::Statistics;
 
     /// Returns a reference to this [`Member`]'s properties.
-    fn properties(&self) -> &P;
+    fn properties(&self) -> &Self::Properties;
 
     /// Returns a mutable reference to this [`Member`]'s properties.
-    fn properties_mut(&mut self) -> &mut P;
+    fn properties_mut(&mut self) -> &mut Self::Properties;
 
     // `Properties` and `Statistics` function escalation (to access them directly via `Member` with additional information).
 

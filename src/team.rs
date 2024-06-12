@@ -1,18 +1,15 @@
 //! Definitions for [`Team`], groups of [`Member`]s that fight in a [`Battle`](crate::battle::Battle).
 
-use std::marker::PhantomData;
-
-use crate::member::{Member, Properties, Statistics};
+use crate::member::Member;
 
 /// Coalition made up of multiple fighting [`Member`]s.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Team<M: Member<S, P>, S: Statistics, P: Properties> {
+pub struct Team<M> {
     name: String,
     member_list: Vec<M>,
-    member_types: PhantomData<(S, P)>,
 }
 
-impl<M: Member<S, P>, S: Statistics, P: Properties> Team<M, S, P> {
+impl<M: Member> Team<M> {
     /// Create a new [`Team`] object using a list of members associated to it.
     pub fn new(name: String, member_list: Vec<M>) -> Self {
         log::debug!(
@@ -20,11 +17,7 @@ impl<M: Member<S, P>, S: Statistics, P: Properties> Team<M, S, P> {
             member_list.len()
         );
 
-        Self {
-            name,
-            member_list,
-            member_types: PhantomData,
-        }
+        Self { name, member_list }
     }
 
     /// Returns this team's name.

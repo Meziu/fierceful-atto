@@ -44,7 +44,10 @@ impl Stats {
     }
 }
 
-impl Member<Stats, Props> for Player {
+impl Member for Player {
+    type Statistics = Stats;
+    type Properties = Props;
+
     fn name(&self) -> &str {
         &self.name
     }
@@ -145,9 +148,9 @@ fn main() {
 }
 
 fn action_choice(
-    team_list: &[Team<Player, Stats, Props>],
+    team_list: &[Team<Player>],
     hint_performer: Option<MemberIdentifier>,
-) -> ChoiceReturn<Player, Stats, Props> {
+) -> ChoiceReturn<Player> {
     // It should never be `None` in our example, but lets avoid panicking nontheless.
     let hint_performer = hint_performer.unwrap_or_default();
 

@@ -1,26 +1,26 @@
 use crate::{
     action::{ChoiceCallback, Context},
-    member::{Member, MemberIdentifier, Properties, Statistics},
+    member::{Member, MemberIdentifier},
     search::SuggestedPerformerCriteria,
     team::Team,
 };
 
 /// Instance of a unique fight between multiple [`Team`]s.
-pub struct Battle<M: Member<S, P>, S: Statistics, P: Properties> {
+pub struct Battle<M> {
     /// List of all teams involved in the battle.
-    team_list: Vec<Team<M, S, P>>,
+    team_list: Vec<Team<M>>,
     #[allow(dead_code)]
     startup: Option<StartupInfo>,
     /// Turn system in charge of handling turns and actions of the battle.
     turn_system: TurnSystem,
     /// Current battle state.
     state: State,
-    suggested_performer_criteria: SuggestedPerformerCriteria<M, S, P>,
-    action_choice_callback: ChoiceCallback<M, S, P>,
+    suggested_performer_criteria: SuggestedPerformerCriteria<M>,
+    action_choice_callback: ChoiceCallback<M>,
 }
 
-pub struct Builder<M: Member<S, P>, S: Statistics, P: Properties> {
-    inner: Battle<M, S, P>,
+pub struct Builder<M> {
+    inner: Battle<M>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -45,11 +45,11 @@ pub enum State {
     Finished,
 }
 
-impl<M: Member<S, P>, S: Statistics, P: Properties> Builder<M, S, P> {
+impl<M: Member> Builder<M> {
     pub fn new(
-        team_list: Vec<Team<M, S, P>>,
+        team_list: Vec<Team<M>>,
         startup: Option<StartupInfo>,
-        action_choice_callback: ChoiceCallback<M, S, P>,
+        action_choice_callback: ChoiceCallback<M>,
         end_condition: EndCondition,
     ) -> Self {
         Self {
@@ -71,23 +71,23 @@ impl<M: Member<S, P>, S: Statistics, P: Properties> Builder<M, S, P> {
     /// By default, [`SuggestedPerformerCriteria::CycleAlive`] is used, as it is the norm for many RPGs.
     pub fn set_suggested_performer_criteria(
         mut self,
-        criteria: SuggestedPerformerCriteria<M, S, P>,
-    ) -> Builder<M, S, P> {
+        criteria: SuggestedPerformerCriteria<M>,
+    ) -> Builder<M> {
         self.inner.suggested_performer_criteria = criteria;
 
         self
     }
 
-    pub fn build(self) -> Battle<M, S, P> {
+    pub fn build(self) -> Battle<M> {
         self.inner
     }
 }
 
-impl<M: Member<S, P>, S: Statistics, P: Properties> Battle<M, S, P> {
+impl<M: Member> Battle<M> {
     /// Runs a [`Battle`] to completion, returning the final state of the battling teams.
     ///
     /// The winner will be declared by the end of this function.
-    pub fn run(mut self) -> Vec<Team<M, S, P>> {
+    pub fn run(mut self) -> Vec<Team<M>> {
         log::info!("The battle has started and will run until its conclusion");
 
         loop {
@@ -143,11 +143,11 @@ impl TurnSystem {
     /// # Panics
     ///
     /// The function will panic if the turn counter overflows `u64::MAX` or if teams/members are not found when specified.
-    pub fn play_turn<M: Member<S, P>, S: Statistics, P: Properties>(
+    pub fn play_turn<M: Member>(
         &mut self,
-        team_list: &mut Vec<Team<M, S, P>>,
-        action_choice_callback: &ChoiceCallback<M, S, P>,
-        suggested_performer_criteria: &SuggestedPerformerCriteria<M, S, P>,
+        team_list: &mut Vec<Team<M>>,
+        action_choice_callback: &ChoiceCallback<M>,
+        suggested_performer_criteria: &SuggestedPerformerCriteria<M>,
     ) -> State {
         // Count the new turn
         self.turn_number = match self.turn_number.checked_add(1) {
@@ -223,10 +223,7 @@ impl TurnSystem {
 
     /// TODO: Subsitute this with an event based check. Iterating every time is slooooooow.
     /// Returns whether or not the battle should continue.
-    fn check_end_condition<M: Member<S, P>, S: Statistics, P: Properties>(
-        &self,
-        team_list: &[Team<M, S, P>],
-    ) -> bool {
+    fn check_end_condition<M: Member>(&self, team_list: &[Team<M>]) -> bool {
         match self.end_condition {
             EndCondition::LastMemberStanding => {
                 let mut members_alive: u8 = 0;
@@ -270,10 +267,10 @@ impl TurnSystem {
         }
     }
 
-    fn suggest_next_performer<M: Member<S, P>, S: Statistics, P: Properties>(
+    fn suggest_next_performer<M: Member>(
         &mut self,
-        team_list: &[Team<M, S, P>],
-        suggested_performer_criteria: &SuggestedPerformerCriteria<M, S, P>,
+        team_list: &[Team<M>],
+        suggested_performer_criteria: &SuggestedPerformerCriteria<M>,
     ) -> Option<MemberIdentifier> {
         suggested_performer_criteria.search(self.suggested_performer, team_list)
     }
