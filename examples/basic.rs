@@ -6,8 +6,8 @@ use fierceful_atto::team::Team;
 // We will use the `DirectAttack` type from the pre-made catalogue to inflict direct damage on our foes.
 use fierceful_atto::catalogue::actions::DirectAttack;
 
-use serde::{Serialize, Deserialize};
 use ron;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Player {
@@ -133,7 +133,11 @@ fn main() {
     ];
 
     // Write the team configuration into a reusable RON file.
-    std::fs::write("./basic-teams.ron", ron::ser::to_string_pretty(&teams, ron::ser::PrettyConfig::default()).unwrap()).unwrap();
+    std::fs::write(
+        "./basic-teams.ron",
+        ron::ser::to_string_pretty(&teams, ron::ser::PrettyConfig::default()).unwrap(),
+    )
+    .unwrap();
 
     // Output the starting configuration of the battling teams.
     println!("Before battle: {teams:#?}");

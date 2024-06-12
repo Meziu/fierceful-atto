@@ -3,7 +3,7 @@
 use crate::member::Member;
 
 #[cfg(feature = "serde")]
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// Coalition made up of multiple fighting [`Member`]s.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
