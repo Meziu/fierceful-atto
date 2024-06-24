@@ -1,15 +1,13 @@
 use fierceful_atto::action::{ChoiceReturn, Target};
 use fierceful_atto::battle::{self, EndCondition};
+use fierceful_atto::equipment::Equipment;
 use fierceful_atto::member::{Member, MemberIdentifier, Properties, Statistics};
 use fierceful_atto::team::Team;
 
-// We will use the `DirectAttack` type from the pre-made catalogue to inflict direct damage on our foes.
+// We will use the `DirectAttack` type from the prefab catalogue to inflict direct damage on our foes.
 use fierceful_atto::catalogue::actions::DirectAttack;
 
-use ron;
-use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Player {
     name: String,
     statistics: Stats,
@@ -26,17 +24,19 @@ impl Player {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Stats {
     pub max_health: u64,
     pub base_attack: u64,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Props {
     pub health: u64,
     pub attack: u64,
 }
+
+pub struct Gear;
 
 impl Stats {
     pub fn new(max_health: u64, base_attack: u64) -> Self {
@@ -50,21 +50,26 @@ impl Stats {
 impl Member for Player {
     type Statistics = Stats;
     type Properties = Props;
+    type Equipment = Gear;
 
     fn name(&self) -> &str {
         &self.name
     }
 
-    fn properties(&self) -> &Props {
+    fn member_properties(&self) -> &Props {
         &self.properties
     }
 
-    fn properties_mut(&mut self) -> &mut Props {
+    fn member_properties_mut(&mut self) -> &mut Props {
         &mut self.properties
     }
 
     fn statistics(&self) -> &Stats {
         &self.statistics
+    }
+
+    fn equipment(&self) -> &Self::Equipment {
+        &Gear
     }
 }
 
@@ -89,6 +94,26 @@ impl Properties for Props {
 
     fn attack(&self) -> u64 {
         self.attack
+    }
+
+    fn sum_properties(&self, rhs: &Self) -> Self {
+        let mut sum = self.clone();
+
+        sum.health = sum.health.saturating_add(rhs.attack);
+        sum.attack = sum.attack.saturating_add(rhs.attack);
+
+        sum
+    }
+}
+
+impl Equipment for Gear {
+    type Properties = Props;
+
+    fn associated_properties(&self) -> Self::Properties {
+        Props {
+            health: 0,
+            attack: 0,
+        }
     }
 }
 
@@ -132,13 +157,6 @@ fn main() {
         Team::new(String::from("Weak Ones"), vec![player_2]),
     ];
 
-    // Write the team configuration into a reusable RON file.
-    std::fs::write(
-        "./basic-teams.ron",
-        ron::ser::to_string_pretty(&teams, ron::ser::PrettyConfig::default()).unwrap(),
-    )
-    .unwrap();
-
     // Output the starting configuration of the battling teams.
     println!("Before battle: {teams:#?}");
 
@@ -164,19 +182,24 @@ fn action_choice(
     // It should never be `None` in our example, but lets avoid panicking nontheless.
     let hint_performer = hint_performer.unwrap_or_default();
 
-    let mut target = MemberIdentifier::zeroed();
+    let mut target = None;
 
     for (t_id, t) in team_list.iter().enumerate() {
         if t_id != hint_performer.team_id {
             for (m_id, _) in t.member_list().iter().enumerate() {
-                target = MemberIdentifier::new(t_id, m_id);
+                target = Some(MemberIdentifier::new(t_id, m_id));
             }
         }
     }
 
+    let target = match target {
+        Some(m_id) => Target::Single(m_id),
+        None => Target::None,
+    };
+
     (
         Box::new(DirectAttack),
         Target::Single(hint_performer),
-        Target::Single(target),
+        target,
     )
 }

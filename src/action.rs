@@ -27,6 +27,8 @@ pub trait Action<M> {
 /// It may also refer to the action's performer.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Target {
+    /// No target is affected by the action.
+    None,
     /// A single member is affected by the action.
     Single(MemberIdentifier),
     /// A specific choice of members is affected by the action.
@@ -85,6 +87,8 @@ impl<'i, 's: 'i, 'team: 'i, M: Member> Context<'team, M> {
     /// Function that iterates over all members targeted.
     fn target_iter(&'s mut self, target: Target) -> Box<dyn Iterator<Item = &'s mut M> + 'i> {
         match target {
+            // Return an empty iterator if no target was found.
+            Target::None => Box::new(std::iter::empty()),
             // Return a `Once` iterator to the single member that is targeted.
             Target::Single(id) => {
                 let team = self.team_list.get_mut(id.team_id);

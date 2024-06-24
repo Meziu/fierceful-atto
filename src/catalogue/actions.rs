@@ -19,7 +19,8 @@ impl<M: Member> Action<M> for DirectAttack {
 
         for p in context.performers() {
             // Calculate the sum of all performers' attacks.
-            damage_sum = damage_sum.saturating_add(p.properties().attack());
+            // In this case, we use the "final" calculated properties based on member equipped gear and other variables.
+            damage_sum = damage_sum.saturating_add(p.final_properties().attack());
         }
 
         for t in context.targets() {
