@@ -1,8 +1,8 @@
-//! Basic implementations of equipment management systems to apply to [members](crate::member::Member) and [teams](crate::team::Team).
+//! Generic equipment management system applicable to [members](crate::member::Member).
 
 use crate::member::Properties;
 
-/// Equipment trait to interoperate with [`Member`](crate::member::Member) statistics and [`Properties`](crate::member::Properties).
+/// Equipment trait to interoperate with a [`Member`](crate::member::Member)'s [`Properties`](crate::member::Properties).
 pub trait Equipment {
     type Properties: Properties;
 
