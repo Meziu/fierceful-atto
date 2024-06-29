@@ -91,13 +91,9 @@ impl<M: Member> Battle<M> {
         log::info!("The battle has started and will run until its conclusion");
 
         loop {
-            self.state = self.turn_system.play_turn(
-                &mut self.team_list,
-                &self.action_choice_callback,
-                &self.suggested_performer_criteria,
-            );
+            self.play_turn();
 
-            if let State::Finished = self.state {
+            if self.is_finished() {
                 log::info!(
                     "The battle has concluded after {} turns",
                     self.turn_system.turn_number
@@ -107,6 +103,26 @@ impl<M: Member> Battle<M> {
         }
 
         // Return ending state of the battling teams.
+        self.end_battle()
+    }
+
+    pub fn play_turn(&mut self) {
+        self.state = self.turn_system.play_turn(
+            &mut self.team_list,
+            &self.action_choice_callback,
+            &self.suggested_performer_criteria,
+        );
+    }
+
+    /// Returns whether this battle has completed or not.
+    pub fn is_finished(&self) -> bool {
+        matches!(self.state, State::Finished)
+    }
+
+    /// Complete the battle and return the state of its participants.
+    pub fn end_battle(mut self) -> Vec<Team<M>> {
+        self.state = State::Finished;
+
         self.team_list
     }
 }
