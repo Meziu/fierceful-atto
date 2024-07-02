@@ -103,10 +103,18 @@ impl<M: Member> Battle<M> {
         }
 
         // Return ending state of the battling teams.
-        self.end_battle()
+        self.take_teams()
     }
 
+    //TODO: Signal end of battle when returning from `play_turn`.
+    /// Runs a [`Battle`] for exactly one turn.
+    ///
+    /// Nothing will be done if the battle's state indicates it has already completed.
     pub fn play_turn(&mut self) {
+        if self.is_finished() {
+            return;
+        }
+
         self.state = self.turn_system.play_turn(
             &mut self.team_list,
             &self.action_choice_callback,
@@ -114,16 +122,25 @@ impl<M: Member> Battle<M> {
         );
     }
 
-    /// Returns whether this battle has completed or not.
+    /// Unwrap the [`Battle`] instance and return the state of its participants.
+    pub fn take_teams(self) -> Vec<Team<M>> {
+        self.team_list
+    }
+}
+
+impl<M> Battle<M> {
+    /// Returns whether this [`Battle`] has completed or not.
     pub fn is_finished(&self) -> bool {
         matches!(self.state, State::Finished)
     }
 
-    /// Complete the battle and return the state of its participants.
-    pub fn end_battle(mut self) -> Vec<Team<M>> {
+    /// Signal the completion of the [`Battle`] to stop its execution.
+    ///
+    /// # Notes
+    ///
+    /// It is necessary to run at least one more turn using [`Battle::play_turn`] for the battle's end to be properly handled.
+    pub fn set_completed(&mut self) {
         self.state = State::Finished;
-
-        self.team_list
     }
 }
 

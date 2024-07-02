@@ -7,15 +7,19 @@ use fierceful_atto::equipment::Equipment;
 use fierceful_atto::member::{Member, MemberIdentifier, Properties, Statistics};
 use fierceful_atto::team::Team;
 
+use ratatui::layout::Constraint;
+use ratatui::style::Stylize;
 // Ratatui imports to make the TUI
 use ratatui::{
-    backend::CrosstermBackend,
+    backend::{Backend, CrosstermBackend},
     crossterm::{
         event::{self, KeyCode, KeyEventKind},
+        execute,
         terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-        ExecutableCommand,
     },
-    widgets::Paragraph,
+    layout::Layout,
+    style::{Color, Style},
+    widgets::{Block, Paragraph},
     Terminal,
 };
 
@@ -140,6 +144,9 @@ impl Statistics for Stats {
 }
 
 fn main() {
+    // Setup a panic hook to correctly exit the application when using Ratatui.
+    init_panic_hook();
+
     // Setup logging using fern.
     let logger_dispatch = fern::Dispatch::new()
         .format(|out, message, record| {
@@ -160,15 +167,8 @@ fn main() {
     }
 
     // Setup TUI using Ratatui.
-    // Enter an alternate screen session.
-    std::io::stdout()
-        .execute(EnterAlternateScreen)
-        .expect("could not enter alternate screen mode on stdout");
-    // Enable raw mode for full control over the term window.
-    enable_raw_mode().expect("could not setup raw mode on terminal");
-    // Setup the used terminal with a compatible backend.
-    let mut terminal = Terminal::new(CrosstermBackend::new(std::io::stdout()))
-        .expect("could not create custom terminal session");
+    // Enter an alternate screen session and enable raw mode for full control over the term window.
+    let mut terminal = init_tui().expect("could not create custom terminal session");
 
     let picco_stats = Stats::new(100, 15);
     let bacco_stats = Stats::new(150, 12);
@@ -193,15 +193,49 @@ fn main() {
     while !battle.is_finished() {
         battle.play_turn();
 
-        terminal.draw(|frame| {
-            let area = frame.size();
-            frame.render_widget(
-                Paragraph::new("Hello Ratatui! (press 'q' to quit)"),
-                area,
-            );
-        }).expect("could not draw ratatui interface");
+        terminal
+            .draw(|frame| {
+                let area = frame.size();
 
-        if event::poll(std::time::Duration::from_millis(16)).expect("could not poll terminal events") {
+                // Split the screen in two main zones, the battle "view", with the playing members, and the battle's menu for the player to use.
+                let screen_split =
+                    Layout::vertical([Constraint::Percentage(75), Constraint::Min(8)]);
+                let [battle_scene_area, battle_menu_area] = screen_split.areas(area);
+
+                frame.render_widget(
+                    Paragraph::new("I'm the battle screen lmao").on_green(),
+                    battle_scene_area,
+                );
+
+                let menu_split =
+                    Layout::horizontal([Constraint::Percentage(40), Constraint::Min(30)]);
+                let [characters_list_area, characters_stats_area] =
+                    menu_split.areas(battle_menu_area);
+
+                let characters_list_block = Block::bordered()
+                    .border_set(ratatui::symbols::border::THICK)
+                    .border_style(Style::default().fg(Color::White))
+                    .style(Style::default().bg(Color::Rgb(13, 61, 86))) // A nice indigo background for enhanced readability.
+                    .title("Statistics");
+
+                let characters_stats_list_area = characters_list_block.inner(characters_stats_area);
+
+                frame.render_widget(
+                    Paragraph::new("We should put a list in here")
+                        .style(Style::default().bg(Color::Rgb(13, 61, 86))),
+                    characters_list_area,
+                );
+
+                frame.render_widget(characters_list_block, characters_stats_area);
+                frame.render_widget(
+                    Paragraph::new("How much health left?"),
+                    characters_stats_list_area,
+                );
+            })
+            .expect("could not draw ratatui interface");
+
+        if event::poll(std::time::Duration::from_secs(16)).expect("could not poll terminal events")
+        {
             if let event::Event::Key(key) = event::read().expect("could not read terminal events") {
                 if key.kind == KeyEventKind::Press && key.code == KeyCode::Char('q') {
                     break;
@@ -210,13 +244,10 @@ fn main() {
         }
     }
 
-    let _resulting_teams = battle.end_battle();
+    let _resulting_teams = battle.take_teams();
 
     // Ratatui exit routine.
-    std::io::stdout()
-        .execute(LeaveAlternateScreen)
-        .expect("could not exit alternate screen mode");
-    disable_raw_mode().expect("could not disable raw mode on terminal session");
+    restore_tui().unwrap();
 }
 
 fn action_choice(
@@ -246,4 +277,25 @@ fn action_choice(
         Target::Single(hint_performer),
         target,
     )
+}
+
+pub fn init_panic_hook() {
+    let original_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |panic_info| {
+        // intentionally ignore errors here since we're already in a panic
+        let _ = restore_tui();
+        original_hook(panic_info);
+    }));
+}
+
+pub fn init_tui() -> std::io::Result<Terminal<impl Backend>> {
+    enable_raw_mode()?;
+    execute!(std::io::stdout(), EnterAlternateScreen)?;
+    Terminal::new(CrosstermBackend::new(std::io::stdout()))
+}
+
+pub fn restore_tui() -> std::io::Result<()> {
+    disable_raw_mode()?;
+    execute!(std::io::stdout(), LeaveAlternateScreen)?;
+    Ok(())
 }
