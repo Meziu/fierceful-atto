@@ -212,21 +212,30 @@ fn main() {
                 let [characters_list_area, characters_stats_area] =
                     menu_split.areas(battle_menu_area);
 
-                let characters_list_block = Block::bordered()
+                let characters_stats_list_block = Block::bordered()
                     .border_set(ratatui::symbols::border::THICK)
                     .border_style(Style::default().fg(Color::White))
                     .style(Style::default().bg(Color::Rgb(13, 61, 86))) // A nice indigo background for enhanced readability.
                     .title("Statistics");
 
-                let characters_stats_list_area = characters_list_block.inner(characters_stats_area);
+                let characters_stats_list_area =
+                    characters_stats_list_block.inner(characters_stats_area);
+
+                let characters_list_block = Block::bordered()
+                    .border_set(ratatui::symbols::border::THICK)
+                    .border_style(Style::default().fg(Color::White))
+                    .style(Style::default().bg(Color::Rgb(13, 61, 86))) // A nice indigo background for enhanced readability.
+                    .title("The Team");
+
+                let characters_name_list_area = characters_list_block.inner(characters_list_area);
+
+                frame.render_widget(characters_list_block, characters_list_area);
+                frame.render_widget(characters_stats_list_block, characters_stats_area);
 
                 frame.render_widget(
-                    Paragraph::new("We should put a list in here")
-                        .style(Style::default().bg(Color::Rgb(13, 61, 86))),
-                    characters_list_area,
+                    Paragraph::new("Who's playing with us?"),
+                    characters_name_list_area,
                 );
-
-                frame.render_widget(characters_list_block, characters_stats_area);
                 frame.render_widget(
                     Paragraph::new("How much health left?"),
                     characters_stats_list_area,
