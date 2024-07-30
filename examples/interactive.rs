@@ -7,8 +7,6 @@ use fierceful_atto::equipment::Equipment;
 use fierceful_atto::member::{Member, MemberIdentifier, Properties, Statistics};
 use fierceful_atto::team::Team;
 
-use ratatui::layout::Constraint;
-use ratatui::style::Stylize;
 // Ratatui imports to make the TUI
 use ratatui::{
     backend::{Backend, CrosstermBackend},
@@ -17,11 +15,13 @@ use ratatui::{
         execute,
         terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     },
-    layout::Layout,
+    layout::{Constraint, Layout},
     style::{Color, Style},
-    widgets::{Block, Paragraph},
+    widgets::{Block, List, ListState, Paragraph},
     Terminal,
 };
+
+const INDIGO: Color = Color::Rgb(13, 61, 86);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Player {
@@ -113,7 +113,7 @@ impl Properties for Props {
     }
 
     fn sum_properties(&self, rhs: &Self) -> Self {
-        let mut sum = self.clone();
+        let mut sum = *self;
 
         sum.health = sum.health.saturating_add(rhs.attack);
         sum.attack = sum.attack.saturating_add(rhs.attack);
@@ -147,25 +147,6 @@ fn main() {
     // Setup a panic hook to correctly exit the application when using Ratatui.
     init_panic_hook();
 
-    // Setup logging using fern.
-    let logger_dispatch = fern::Dispatch::new()
-        .format(|out, message, record| {
-            out.finish(format_args!(
-                "[{} {} {}] {}",
-                humantime::format_rfc3339_seconds(std::time::SystemTime::now()),
-                record.level(),
-                record.target(),
-                message
-            ))
-        })
-        .level(log::LevelFilter::Debug)
-        //.chain(std::io::stdout())
-        ;
-
-    if logger_dispatch.apply().is_err() {
-        eprintln!("could not setup logger. log information will not be retrieved")
-    }
-
     // Setup TUI using Ratatui.
     // Enter an alternate screen session and enable raw mode for full control over the term window.
     let mut terminal = init_tui().expect("could not create custom terminal session");
@@ -181,7 +162,7 @@ fn main() {
         Team::new(String::from("Weak Ones"), vec![player_2]),
     ];
 
-    // The battle must be mutable to make incremental steps (it's currently fully consumed by the system)
+    // The battle must be mutable to make incremental steps
     let mut battle = battle::Builder::new(
         teams,
         None,
@@ -189,6 +170,8 @@ fn main() {
         EndCondition::LastTeamStanding,
     )
     .build();
+
+    let mut character_list_state = ListState::default();
 
     while !battle.is_finished() {
         battle.play_turn();
@@ -202,11 +185,6 @@ fn main() {
                     Layout::vertical([Constraint::Percentage(75), Constraint::Min(8)]);
                 let [battle_scene_area, battle_menu_area] = screen_split.areas(area);
 
-                frame.render_widget(
-                    Paragraph::new("I'm the battle screen lmao").on_green(),
-                    battle_scene_area,
-                );
-
                 let menu_split =
                     Layout::horizontal([Constraint::Percentage(40), Constraint::Min(30)]);
                 let [characters_list_area, characters_stats_area] =
@@ -215,39 +193,67 @@ fn main() {
                 let characters_stats_list_block = Block::bordered()
                     .border_set(ratatui::symbols::border::THICK)
                     .border_style(Style::default().fg(Color::White))
-                    .style(Style::default().bg(Color::Rgb(13, 61, 86))) // A nice indigo background for enhanced readability.
+                    .style(Style::default().bg(INDIGO)) // A nice indigo background for enhanced readability.
                     .title("Statistics");
 
                 let characters_stats_list_area =
                     characters_stats_list_block.inner(characters_stats_area);
 
-                let characters_list_block = Block::bordered()
-                    .border_set(ratatui::symbols::border::THICK)
-                    .border_style(Style::default().fg(Color::White))
-                    .style(Style::default().bg(Color::Rgb(13, 61, 86))) // A nice indigo background for enhanced readability.
-                    .title("The Team");
-
-                let characters_name_list_area = characters_list_block.inner(characters_list_area);
-
-                frame.render_widget(characters_list_block, characters_list_area);
                 frame.render_widget(characters_stats_list_block, characters_stats_area);
 
                 frame.render_widget(
-                    Paragraph::new("Who's playing with us?"),
-                    characters_name_list_area,
+                    Paragraph::new("I'm the battle screen lmao"),
+                    battle_scene_area,
                 );
                 frame.render_widget(
                     Paragraph::new("How much health left?"),
                     characters_stats_list_area,
                 );
+
+                // CHARACTER LIST
+                let characters_list_block = Block::bordered()
+                    .border_set(ratatui::symbols::border::THICK)
+                    .border_style(Style::default().fg(Color::White))
+                    .style(Style::default().bg(INDIGO))
+                    .title("The Team");
+
+                let friendly_team = &battle
+                    .teams()
+                    .get(0)
+                    .expect("battle has no teams available to show");
+
+                let name_list: Vec<&str> = friendly_team
+                    .member_list()
+                    .into_iter()
+                    .map(|m| m.name())
+                    .collect();
+
+                let character_list = List::new(name_list)
+                    .block(characters_list_block)
+                    .highlight_symbol(">");
+
+                frame.render_stateful_widget(
+                    character_list,
+                    characters_list_area,
+                    &mut character_list_state,
+                )
             })
             .expect("could not draw ratatui interface");
 
         if event::poll(std::time::Duration::from_secs(16)).expect("could not poll terminal events")
         {
             if let event::Event::Key(key) = event::read().expect("could not read terminal events") {
-                if key.kind == KeyEventKind::Press && key.code == KeyCode::Char('q') {
-                    break;
+                match key.kind {
+                    KeyEventKind::Press => match key.code {
+                        // Exit routine.
+                        KeyCode::Char('q') => break,
+                        // Select the previus choice in the list.
+                        KeyCode::Up => character_list_state.select_previous(),
+                        // Select the next choice in the list.
+                        KeyCode::Down => character_list_state.select_next(),
+                        _ => (),
+                    },
+                    _ => (),
                 }
             }
         }
@@ -259,11 +265,12 @@ fn main() {
     restore_tui().unwrap();
 }
 
+// TODO: Wrap this method into a closure with a runtime taken reference to the enemy target.
 fn action_choice(
     team_list: &[Team<Player>],
     hint_performer: Option<MemberIdentifier>,
 ) -> ChoiceReturn<Player> {
-    // It should never be `None` in our example, but lets avoid panicking nontheless.
+    // It should never be `None` in our example, but in case it is we'll just use the first friendly member.
     let hint_performer = hint_performer.unwrap_or_default();
 
     let mut target = None;

@@ -97,7 +97,7 @@ impl Properties for Props {
     }
 
     fn sum_properties(&self, rhs: &Self) -> Self {
-        let mut sum = self.clone();
+        let mut sum = *self; // Props implements `Copy` in this example.
 
         sum.health = sum.health.saturating_add(rhs.attack);
         sum.attack = sum.attack.saturating_add(rhs.attack);

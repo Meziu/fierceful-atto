@@ -122,6 +122,10 @@ impl<M: Member> Battle<M> {
         );
     }
 
+    pub fn teams(&self) -> &[Team<M>] {
+        &self.team_list
+    }
+
     /// Unwrap the [`Battle`] instance and return the state of its participants.
     pub fn take_teams(self) -> Vec<Team<M>> {
         self.team_list
