@@ -173,6 +173,7 @@ fn main() {
     )
     .build();
 
+    let mut enemy_list_state = ListState::default();
     let mut character_list_state = ListState::default();
 
     while !battle.is_finished() {
@@ -244,7 +245,7 @@ fn main() {
                         "member health ratio exceeds bounds of double precision floating point numbers",
                     );
 
-                    LineGauge::default().ratio(ratio).label(format!("{health}/{reference_health}"))
+                    LineGauge::default().ratio(ratio).label(format!("Health: {health}/{reference_health}"))
                 }).next().unwrap();
 
                 frame.render_widget(
@@ -262,9 +263,9 @@ fn main() {
                         // Exit routine.
                         KeyCode::Char('q') => break,
                         // Select the previus choice in the list.
-                        KeyCode::Up => character_list_state.select_previous(),
+                        KeyCode::Right => enemy_list_state.select_previous(),
                         // Select the next choice in the list.
-                        KeyCode::Down => character_list_state.select_next(),
+                        KeyCode::Left => enemy_list_state.select_next(),
                         _ => (),
                     },
                     _ => (),
