@@ -17,9 +17,11 @@ use ratatui::{
     },
     layout::{Constraint, Layout},
     style::{Color, Style},
-    widgets::{Block, List, ListState, Paragraph},
+    widgets::{Block, LineGauge, List, ListState, Paragraph},
     Terminal,
 };
+
+use num::{rational::Ratio, ToPrimitive};
 
 const INDIGO: Color = Color::Rgb(13, 61, 86);
 
@@ -151,7 +153,7 @@ fn main() {
     // Enter an alternate screen session and enable raw mode for full control over the term window.
     let mut terminal = init_tui().expect("could not create custom terminal session");
 
-    let picco_stats = Stats::new(100, 15);
+    let picco_stats = Stats::new(120, 15);
     let bacco_stats = Stats::new(150, 12);
 
     let player_1 = Player::new(String::from("Picco"), picco_stats, Props::from(picco_stats));
@@ -178,7 +180,7 @@ fn main() {
 
         terminal
             .draw(|frame| {
-                let area = frame.size();
+                let area = frame.area();
 
                 // Split the screen in two main zones, the battle "view", with the playing members, and the battle's menu for the player to use.
                 let screen_split =
@@ -205,10 +207,6 @@ fn main() {
                     Paragraph::new("I'm the battle screen lmao"),
                     battle_scene_area,
                 );
-                frame.render_widget(
-                    Paragraph::new("How much health left?"),
-                    characters_stats_list_area,
-                );
 
                 // CHARACTER LIST
                 let characters_list_block = Block::bordered()
@@ -222,11 +220,10 @@ fn main() {
                     .get(0)
                     .expect("battle has no teams available to show");
 
-                let name_list: Vec<&str> = friendly_team
-                    .member_list()
-                    .into_iter()
-                    .map(|m| m.name())
-                    .collect();
+                let friendly_members_iter = friendly_team.member_list().into_iter();
+
+                let name_list: Vec<&str> =
+                    friendly_members_iter.clone().map(|m| m.name()).collect();
 
                 let character_list = List::new(name_list)
                     .block(characters_list_block)
@@ -236,7 +233,24 @@ fn main() {
                     character_list,
                     characters_list_area,
                     &mut character_list_state,
-                )
+                );
+
+                // CHARACTER STATUS
+                let health_gauge: LineGauge = friendly_members_iter.clone().map(|m| {
+                    let health = m.member_properties().health();
+                    let reference_health = m.statistics().reference_health();
+
+                    let ratio: f64 = Ratio::new(health, reference_health).to_f64().expect(
+                        "member health ratio exceeds bounds of double precision floating point numbers",
+                    );
+
+                    LineGauge::default().ratio(ratio).label(format!("{health}/{reference_health}"))
+                }).next().unwrap();
+
+                frame.render_widget(
+                    health_gauge,
+                    characters_stats_list_area,
+                );
             })
             .expect("could not draw ratatui interface");
 
