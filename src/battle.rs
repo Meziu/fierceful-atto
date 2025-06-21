@@ -247,7 +247,7 @@ impl TurnSystem {
         // TODO: Run an "end of turn" custom hook.
 
         // Check whether the battle should continue or whether it's finished.
-        if self.check_end_condition(team_list) {
+        if self.battle_should_end(team_list) {
             return State::Finished;
         }
 
@@ -260,7 +260,7 @@ impl TurnSystem {
 
     /// TODO: Subsitute this with an event based check. Iterating every time is slooooooow.
     /// Returns whether or not the battle should continue.
-    fn check_end_condition<M: Member>(&self, team_list: &[Team<M>]) -> bool {
+    fn battle_should_end<M: Member>(&self, team_list: &[Team<M>]) -> bool {
         match self.end_condition {
             EndCondition::LastMemberStanding => {
                 let mut members_alive: u8 = 0;
