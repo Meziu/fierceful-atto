@@ -25,7 +25,6 @@ pub enum SuggestedPerformerCriteria<M> {
     CycleWith(Box<FilterCriteria<M>>),
 }
 
-// TODO: remove yucky code duplication
 impl<M: Member> SuggestedPerformerCriteria<M> {
     pub fn search(
         &self,
@@ -33,46 +32,41 @@ impl<M: Member> SuggestedPerformerCriteria<M> {
         team_list: &[Team<M>],
     ) -> Option<MemberIdentifier> {
         match self {
-            Self::None => return None,
-            Self::Constant(member) => return Some(*member),
+            Self::None => None,
+            Self::Constant(member) => Some(*member),
             Self::CycleAlive => {
-                let current_playing_member = current_playing_member.unwrap_or_default();
-
-                for (team_id, team) in
-                    cycle_from_point_enumerated(team_list, current_playing_member.team_id)
-                {
-                    let skip = if current_playing_member.team_id == team_id {
-                        current_playing_member.member_id + 1
-                    } else {
-                        0
-                    };
-
-                    for (member_id, member) in team.member_list().iter().enumerate().skip(skip) {
-                        if member.health() != 0 {
-                            return Some(MemberIdentifier { team_id, member_id });
-                        }
-                    }
-                }
+                self.cycle_with_condition(current_playing_member, team_list, |_, member| {
+                    member.health() > 0
+                })
             }
             Self::CycleWith(condition) => {
-                let current_playing_member = current_playing_member.unwrap_or_default();
+                self.cycle_with_condition(current_playing_member, team_list, condition)
+            }
+        }
+    }
 
-                for (team_id, team) in
-                    cycle_from_point_enumerated(team_list, current_playing_member.team_id)
-                {
-                    let skip = if current_playing_member.team_id == team_id {
-                        current_playing_member.member_id + 1
-                    } else {
-                        0
-                    };
+    fn cycle_with_condition<F>(
+        &self,
+        current_playing_member: Option<MemberIdentifier>,
+        team_list: &[Team<M>],
+        condition: F,
+    ) -> Option<MemberIdentifier>
+    where
+        F: Fn(MemberIdentifier, &M) -> bool,
+    {
+        let current = current_playing_member.unwrap_or_default();
 
-                    for (member_id, member) in team.member_list().iter().enumerate().skip(skip) {
-                        let id = MemberIdentifier::new(team_id, member_id);
+        for (team_id, team) in cycle_from_point_enumerated(team_list, current.team_id) {
+            let start_member = if current.team_id == team_id {
+                current.member_id + 1
+            } else {
+                0
+            };
 
-                        if condition(id, member) {
-                            return Some(MemberIdentifier { team_id, member_id });
-                        }
-                    }
+            for (member_id, member) in team.member_list().iter().enumerate().skip(start_member) {
+                let id = MemberIdentifier::new(team_id, member_id);
+                if condition(id, member) {
+                    return Some(id);
                 }
             }
         }
