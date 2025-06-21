@@ -5,7 +5,9 @@ use fierceful_atto::member::{Member, MemberIdentifier, Properties, Statistics};
 use fierceful_atto::team::Team;
 
 // We will use the `DirectAttack` type from the prefab catalogue to inflict direct damage on our foes.
-use fierceful_atto::catalogue::actions::DirectAttack;
+// We will also use the `Heal` type for sporadic healing.
+use fierceful_atto::catalogue::actions::{DirectAttack, Heal};
+use rand::Rng;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Player {
@@ -182,17 +184,50 @@ fn action_choice(
     // It should never be `None` in our example, but lets avoid panicking nontheless.
     let hint_performer = hint_performer.unwrap_or_default();
 
-    let mut target = None;
+    let mut rng = rand::thread_rng();
+
+    // 30% chance to heal, 70% chance to attack
+    if rng.gen_bool(0.3) {
+        // Healing action - target a teammate or self
+        let mut heal_target = None;
+
+        // Find a teammate (including self) who needs healing
+        for (t_id, t) in team_list.iter().enumerate() {
+            if t_id == hint_performer.team_id {
+                for (m_id, member) in t.member_list().iter().enumerate() {
+                    if member.health() < member.statistics().reference_health() {
+                        heal_target = Some(MemberIdentifier::new(t_id, m_id));
+                        break;
+                    }
+                }
+            }
+        }
+
+        let target = match heal_target {
+            Some(m_id) => Target::Single(m_id),
+            // There should always be an available target (the performer), but we use this as a failsafe
+            None => Target::Single(hint_performer),
+        };
+
+        return (
+            Box::new(Heal { amount: 25 }),
+            Target::Single(hint_performer),
+            target,
+        );
+    }
+
+    // Attack action- find an enemy
+    let mut attack_target = None;
 
     for (t_id, t) in team_list.iter().enumerate() {
         if t_id != hint_performer.team_id {
             for (m_id, _) in t.member_list().iter().enumerate() {
-                target = Some(MemberIdentifier::new(t_id, m_id));
+                attack_target = Some(MemberIdentifier::new(t_id, m_id));
             }
         }
     }
 
-    let target = match target {
+    let target = match attack_target {
         Some(m_id) => Target::Single(m_id),
         None => Target::None,
     };

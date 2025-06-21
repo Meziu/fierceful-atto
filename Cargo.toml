@@ -16,6 +16,7 @@ ron = { version = "0.10" }
 humantime = "2.1"
 fern = "0.7"
 ratatui = "0.29"
+rand = "0.8"
 
 [features]
 default = []
