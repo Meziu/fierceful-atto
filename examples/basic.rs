@@ -184,10 +184,10 @@ fn action_choice(
     // It should never be `None` in our example, but lets avoid panicking nontheless.
     let hint_performer = hint_performer.unwrap_or_default();
 
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
 
     // 30% chance to heal, 70% chance to attack
-    if rng.gen_bool(0.3) {
+    if rng.random_bool(0.3) {
         // Healing action - target a teammate or self
         let mut heal_target = None;
 
