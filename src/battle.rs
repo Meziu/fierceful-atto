@@ -20,7 +20,7 @@ pub struct Battle<M> {
 }
 
 pub struct Builder<M> {
-    inner: Battle<M>,
+    battle: Battle<M>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -53,7 +53,7 @@ impl<M: Member> Builder<M> {
         end_condition: EndCondition,
     ) -> Self {
         Self {
-            inner: Battle {
+            battle: Battle {
                 team_list,
                 startup,
                 turn_system: TurnSystem::new(MemberIdentifier::zeroed(), end_condition),
@@ -64,7 +64,7 @@ impl<M: Member> Builder<M> {
         }
     }
 
-    /// Set the criteria used to suggest the performign member.
+    /// Set the criteria used to suggest the performing member.
     ///
     /// # Notes
     ///
@@ -72,14 +72,13 @@ impl<M: Member> Builder<M> {
     pub fn set_suggested_performer_criteria(
         mut self,
         criteria: SuggestedPerformerCriteria<M>,
-    ) -> Builder<M> {
-        self.inner.suggested_performer_criteria = criteria;
-
+    ) -> Self {
+        self.battle.suggested_performer_criteria = criteria;
         self
     }
 
     pub fn build(self) -> Battle<M> {
-        self.inner
+        self.battle
     }
 }
 
@@ -186,119 +185,99 @@ impl TurnSystem {
         action_choice_callback: &ChoiceCallback<M>,
         suggested_performer_criteria: &SuggestedPerformerCriteria<M>,
     ) -> State {
-        // Count the new turn
-        self.turn_number = match self.turn_number.checked_add(1) {
-            Some(t) => t,
-            None => {
-                log::error!("Turn counter overflowed after {} turns", self.turn_number);
-
-                panic!("turn counter overflowed");
-            }
-        };
-
+        self.increment_turn_counter();
         log::info!("Playing turn number {}.", self.turn_number);
 
-        if let Some(performing_member) = self.suggested_performer {
-            // Get the playing team.
-            let playing_team = match team_list.get(performing_member.team_id) {
-                Some(pt) => pt,
-                None => {
-                    log::warn!(
-                        "Playing team with id {:?} was not found",
-                        performing_member.team_id
-                    );
-
-                    panic!(
-                        "requested team with id {} was not found",
-                        performing_member.team_id
-                    );
-                }
-            };
-
-            log::info!("Plays the team \"{}\"", playing_team.name());
-
-            // Get the "active" player of this turn.
-            let playing_member = match playing_team.member(performing_member.member_id) {
-                Some(pm) => pm,
-                None => {
-                    log::warn!(
-                        "Playing member with id {:?} was not found",
-                        performing_member
-                    );
-
-                    panic!(
-                        "requested member with id {} was not found",
-                        performing_member.member_id
-                    );
-                }
-            };
-
-            log::info!("It's the turn of {}", playing_member.name());
-        }
+        self.log_current_performer(team_list);
 
         let (mut action, performers, targets) =
             action_choice_callback(team_list, self.suggested_performer);
 
-        // Setup the chosen action
+        // Execute the chosen action
         let context = Context::new(team_list, performers, targets);
         action.act(context);
 
         // TODO: Programmatically decide when the turn should end (after every player acts? after one player acts?)
         // TODO: Run an "end of turn" custom hook.
 
-        // Check whether the battle should continue or whether it's finished.
         if self.battle_should_end(team_list) {
-            return State::Finished;
+            State::Finished
+        } else {
+            self.suggested_performer =
+                self.suggest_next_performer(team_list, suggested_performer_criteria);
+            State::InProgress
         }
-
-        // TODO: custom performer finder (does it even make sense with the "everyone can perform" model? maybe just as default behaviour for a more modular system)
-        self.suggested_performer =
-            self.suggest_next_performer(team_list, suggested_performer_criteria);
-
-        State::InProgress
     }
 
-    /// TODO: Subsitute this with an event based check. Iterating every time is slooooooow.
+    fn increment_turn_counter(&mut self) {
+        self.turn_number = self.turn_number.checked_add(1).unwrap_or_else(|| {
+            log::error!("Turn counter overflowed after {} turns", self.turn_number);
+            panic!("turn counter overflowed");
+        });
+    }
+
+    fn log_current_performer<M: Member>(&self, team_list: &[Team<M>]) {
+        let Some(performing_member) = self.suggested_performer else {
+            return;
+        };
+
+        let team = team_list.get(performing_member.team_id).unwrap_or_else(|| {
+            log::warn!(
+                "Playing team with id {:?} was not found",
+                performing_member.team_id
+            );
+            panic!(
+                "requested team with id {} was not found",
+                performing_member.team_id
+            );
+        });
+
+        log::info!("Plays the team \"{}\"", team.name());
+
+        let member = team.member(performing_member.member_id).unwrap_or_else(|| {
+            log::warn!(
+                "Playing member with id {:?} was not found",
+                performing_member
+            );
+            panic!(
+                "requested member with id {} was not found",
+                performing_member.member_id
+            );
+        });
+
+        log::info!("It's the turn of {}", member.name());
+    }
+
+    /// TODO: Substitute this with an event based check. Iterating every time is slooooooow.
     /// Returns whether or not the battle should continue.
     fn battle_should_end<M: Member>(&self, team_list: &[Team<M>]) -> bool {
         match self.end_condition {
             EndCondition::LastMemberStanding => {
                 let mut members_alive: u8 = 0;
-
-                for t in team_list {
-                    for m in t.member_list() {
-                        if m.health() > 0 {
+                for team in team_list {
+                    for member in team.member_list() {
+                        if member.health() > 0 {
                             members_alive = members_alive.saturating_add(1);
-
-                            // We don't need to check every member. Once we find 2 alive, we know the battle should continue.
+                            // Early exit optimization - if we find 2+ alive, battle continues
                             if members_alive >= 2 {
                                 return false;
                             }
                         }
                     }
                 }
-
                 true
             }
             EndCondition::LastTeamStanding => {
                 let mut teams_alive: u8 = 0;
-
-                for t in team_list {
-                    for m in t.member_list() {
-                        if m.health() > 0 {
-                            teams_alive = teams_alive.saturating_add(1);
-
-                            // We don't need to check every team. Once we find 2 alive, we know the battle should continue.
-                            if teams_alive >= 2 {
-                                return false;
-                            }
-
-                            // If even one member is alive, we know the state of this team (and can go check the next one).
-                            break;
+                for team in team_list {
+                    if team.member_list().iter().any(|m| m.health() > 0) {
+                        teams_alive = teams_alive.saturating_add(1);
+                        // Early exit optimization - if we find 2+ alive teams, battle continues
+                        if teams_alive >= 2 {
+                            return false;
                         }
                     }
                 }
-
                 true
             }
         }

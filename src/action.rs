@@ -49,7 +49,7 @@ pub struct Context<'team, M> {
     targets: Target,
 }
 
-impl<'i, 's: 'i, 'team: 'i, M: Member> Context<'team, M> {
+impl<'team, M: Member> Context<'team, M> {
     pub fn new(team_list: &'team mut Vec<Team<M>>, performers: Target, targets: Target) -> Self {
         Self {
             team_list,
@@ -67,7 +67,7 @@ impl<'i, 's: 'i, 'team: 'i, M: Member> Context<'team, M> {
     /// The result of this function depends on the [`Target`]s passed as input in the [`Context`] struct.
     /// If members are not placed where the [`MemberIdentifier`]s are pointing to, either the wrong member
     /// is going to be returned, or no reference will be returned. Beware of the [`Team`]'s ordering.
-    pub fn performers(&'s mut self) -> Box<dyn Iterator<Item = &'s mut M> + 'i> {
+    pub fn performers(&mut self) -> Box<dyn Iterator<Item = &mut M> + '_> {
         self.target_iter(self.performers.clone())
     }
 
@@ -80,64 +80,76 @@ impl<'i, 's: 'i, 'team: 'i, M: Member> Context<'team, M> {
     /// The result of this function depends on the [`Target`]s passed as input in the [`Context`] struct.
     /// If members are not placed where the [`MemberIdentifier`]s are pointing to, either the wrong member
     /// is going to be returned, or no reference will be returned. Beware of the [`Team`]'s ordering.
-    pub fn targets(&'s mut self) -> Box<dyn Iterator<Item = &'s mut M> + 'i> {
+    pub fn targets(&mut self) -> Box<dyn Iterator<Item = &mut M> + '_> {
         self.target_iter(self.targets.clone())
     }
 
     /// Function that iterates over all members targeted.
-    fn target_iter(&'s mut self, target: Target) -> Box<dyn Iterator<Item = &'s mut M> + 'i> {
+    fn target_iter(&mut self, target: Target) -> Box<dyn Iterator<Item = &mut M> + '_> {
         match target {
-            // Return an empty iterator if no target was found.
             Target::None => Box::new(std::iter::empty()),
-            // Return a `Once` iterator to the single member that is targeted.
-            Target::Single(id) => {
-                let team = self.team_list.get_mut(id.team_id);
-
-                if let Some(t) = team {
-                    if let Some(m) = t.member_mut(id.member_id) {
-                        return Box::new(std::iter::once(m));
-                    }
-                }
-
-                log::warn!("Could not find requested member at index {:?}. Returning an empty iterator instead", id);
-
-                // If the member wasn't found, return an empty iterator.
-                Box::new(std::iter::empty())
-            }
-            // Return a filtered iterator over all individual targets.
-            Target::DiscreteMultiple(targets) => Box::new(
-                self.team_list
-                    .iter_mut()
-                    // Enumerating helps filter which teams/members we are actually targeting.
-                    .enumerate()
-                    .flat_map(|(i, t)| {
-                        // `Repeat` is used to return the same `team_id` number to each member of a team.
-                        // We also re-enumerate over the members to keep track of the `member_id`
-                        std::iter::repeat(i).zip(t.member_list_mut().iter_mut().enumerate())
-                    })
-                    .filter(move |(t_id, (m_id, _))| {
-                        targets.contains(&MemberIdentifier {
-                            team_id: *t_id,
-                            member_id: *m_id,
-                        })
-                    })
-                    .map(|(_, (_, m))| m),
-            ),
-            // Returns an iterator that iterates over every member of a single team.
-            Target::FullTeam { team_id } => match self.team_list.get_mut(team_id) {
-                Some(team) => Box::new(team.member_list_mut().iter_mut()),
-                None => {
-                    log::warn!("Could not find requested team at index {}. Returning an empty iterator instead", team_id);
-
-                    Box::new(std::iter::empty())
-                }
-            },
-            // Returns an iterator that iterates over every member of every team. It's pretty simple with `flat_map()`.
+            Target::Single(id) => self.get_single_member_iter(id),
+            Target::DiscreteMultiple(targets) => self.get_discrete_members_iter(targets),
+            Target::FullTeam { team_id } => self.get_team_members_iter(team_id),
             Target::All => Box::new(
                 self.team_list
                     .iter_mut()
-                    .flat_map(|t| t.member_list_mut().iter_mut()),
+                    .flat_map(|team| team.member_list_mut().iter_mut()),
             ),
+        }
+    }
+
+    fn get_single_member_iter(
+        &mut self,
+        id: MemberIdentifier,
+    ) -> Box<dyn Iterator<Item = &mut M> + '_> {
+        match self
+            .team_list
+            .get_mut(id.team_id)
+            .and_then(|team| team.member_mut(id.member_id))
+        {
+            Some(member) => Box::new(std::iter::once(member)),
+            None => {
+                log::warn!(
+                    "Could not find requested member at index {:?}. Returning an empty iterator instead",
+                    id
+                );
+                Box::new(std::iter::empty())
+            }
+        }
+    }
+
+    fn get_discrete_members_iter(
+        &mut self,
+        targets: Vec<MemberIdentifier>,
+    ) -> Box<dyn Iterator<Item = &mut M> + '_> {
+        Box::new(
+            self.team_list
+                .iter_mut()
+                .enumerate()
+                .flat_map(|(team_id, team)| {
+                    std::iter::repeat(team_id).zip(team.member_list_mut().iter_mut().enumerate())
+                })
+                .filter(move |(team_id, (member_id, _))| {
+                    targets.contains(&MemberIdentifier {
+                        team_id: *team_id,
+                        member_id: *member_id,
+                    })
+                })
+                .map(|(_, (_, member))| member),
+        )
+    }
+
+    fn get_team_members_iter(&mut self, team_id: usize) -> Box<dyn Iterator<Item = &mut M> + '_> {
+        match self.team_list.get_mut(team_id) {
+            Some(team) => Box::new(team.member_list_mut().iter_mut()),
+            None => {
+                log::warn!(
+                    "Could not find requested team at index {}. Returning an empty iterator instead",
+                    team_id
+                );
+                Box::new(std::iter::empty())
+            }
         }
     }
 }
